@@ -65,6 +65,12 @@ services:
       # Enables the trace-to-logs and logs-to-trace correlation described in
       # PROD-PLATFORM-CONFLUENCE.md section 6.
       GF_FEATURE_TOGGLES_ENABLE: traceToMetrics
+      # Lets the LLM Operations dashboard query Langfuse's own ClickHouse
+      # store directly (real token/cost/latency data already flowing via
+      # P0-5) instead of waiting on P0-1/P0-2/P0-3 app instrumentation
+      # that doesn't exist yet.
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: grafana-clickhouse-datasource
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

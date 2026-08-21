@@ -1,0 +1,12 @@
+# Auto-loads any dashboard JSON dropped in ./grafana/dashboards — "as code,
+# provisioned" per PROD-PLATFORM-CONFLUENCE.md §5, not manual clicking.
+apiVersion: 1
+
+providers:
+  - name: sfm
+    folder: "Schema Field Mapper"
+    type: file
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

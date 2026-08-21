@@ -37,3 +37,22 @@ datasources:
       serviceMap:
         datasourceUid: prometheus
     editable: true
+
+  # Points at Langfuse's own ClickHouse store — real token/cost/latency
+  # data from every traced LLM call (P0-5), queryable directly. This is
+  # what backs the "LLM Operations" dashboard; it doesn't need P0-1/P0-2/
+  # P0-3 app instrumentation to have real data to show.
+  - name: Langfuse ClickHouse
+    type: grafana-clickhouse-datasource
+    uid: langfuse-clickhouse
+    access: proxy
+    jsonData:
+      host: langfuse-clickhouse
+      port: 8123
+      protocol: http
+      secure: false
+      defaultDatabase: default
+      username: clickhouse
+    secureJsonData:
+      password: clickhouse
+    editable: true
