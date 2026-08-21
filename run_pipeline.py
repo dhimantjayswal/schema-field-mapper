@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """CLI entrypoint — runs Stages 0-7 end to end and writes output/mapping.json.
 
-Requires ANTHROPIC_API_KEY (Stage 4 / 7 make real Claude calls). Everything
-else runs locally: table alignment (Stage 1) is a heuristic, candidate
-retrieval (Stage 3) is a local sentence-transformers model, validation
-(Stage 5) and assembly (Stage 6) are pure code.
+Stage 4/7 need an LLM: Claude (ANTHROPIC_API_KEY, the primary design
+target) or a local Ollama model (no key, no cost — auto-selected when no
+key is set). Everything else runs locally regardless: table alignment
+(Stage 1) is a heuristic, candidate retrieval (Stage 3) is a local
+sentence-transformers model, validation (Stage 5) and assembly (Stage 6)
+are pure code.
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -16,7 +19,7 @@ from dotenv import load_dotenv
 from pipeline.align_tables import align_tables
 from pipeline.assemble import assemble
 from pipeline.embed_candidates import SentenceTransformerEmbedder
-from pipeline.llm_client import ClaudeLLMClient
+from pipeline.llm_client import ClaudeLLMClient, OllamaLLMClient
 from pipeline.map_fields import map_table
 from pipeline.reask import reask_low_confidence
 from pipeline.validate import validate_table_mapping
@@ -31,11 +34,19 @@ def main() -> int:
     parser.add_argument("--top-k", type=int, default=5, help="candidates retrieved per source field")
     parser.add_argument("--confidence-threshold", type=float, default=0.7,
                          help="fields below this trigger a Stage 7 re-ask")
+    parser.add_argument("--llm-backend", choices=["claude", "ollama"], default=None,
+                         help="defaults to claude if ANTHROPIC_API_KEY is set, else ollama")
+    parser.add_argument("--ollama-model", default="qwen2.5:7b",
+                         help="model tag for --llm-backend ollama (must already be pulled)")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
+    backend = args.llm_backend or ("claude" if os.environ.get("ANTHROPIC_API_KEY") else "ollama")
+    llm = ClaudeLLMClient() if backend == "claude" else OllamaLLMClient(model=args.ollama_model)
+    if args.verbose:
+        print(f"LLM backend: {backend}" + (f" ({args.ollama_model})" if backend == "ollama" else ""))
+
     embedder = SentenceTransformerEmbedder()
-    llm = ClaudeLLMClient()
 
     tables = []
     for alignment in align_tables():
