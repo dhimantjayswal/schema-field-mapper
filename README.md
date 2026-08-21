@@ -60,6 +60,21 @@ required, no model download. `tests/fakes.py` provides a deterministic
 bag-of-words embedder and a fake LLM client that exercise the real pipeline
 wiring (Stages 0-7) against fixed, inspectable logic.
 
+Every function in `pipeline/` also has a docstring with a runnable
+`Example:` (verified via `doctest`, not just written and hoped-for):
+
+```bash
+python -c "
+import doctest, importlib
+mods = ['pipeline.names', 'pipeline.parse_schema', 'pipeline.align_tables',
+         'pipeline.embed_candidates', 'pipeline.llm_client', 'pipeline.prompts',
+         'pipeline.map_fields', 'pipeline.validate', 'pipeline.reask',
+         'pipeline.assemble', 'tests.fakes']
+for name in mods:
+    print(name, doctest.testmod(importlib.import_module(name)))
+"
+```
+
 ## Pipeline stages
 
 | Stage | Module | LLM call? |

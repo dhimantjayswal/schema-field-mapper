@@ -10,6 +10,15 @@ from data.source_schema import SOURCE_SCHEMA
 
 @dataclass(frozen=True)
 class SourceField:
+    """One column of one MySQL table from `data.source_schema.SOURCE_SCHEMA`.
+
+    Example:
+        >>> f = SourceField(table="emp_master", field="rec_stat", type="CHAR(1)",
+        ...                 comment="A=Active, I=Inactive, T=Terminated")
+        >>> f.description
+        'emp_master.rec_stat — CHAR(1) — A=Active, I=Inactive, T=Terminated'
+    """
+
     table: str
     field: str
     type: str
@@ -21,6 +30,10 @@ class SourceField:
 
     @property
     def description(self) -> str:
+        """Human-readable text embedded (Stage 3) and shown to the LLM
+        (Stage 4) — includes the PK/FK/comment context that carries most
+        of the field's semantic signal.
+        """
         bits = [f"{self.table}.{self.field}", self.type]
         if self.pk:
             bits.append("PRIMARY KEY")
@@ -33,6 +46,19 @@ class SourceField:
 
 @dataclass(frozen=True)
 class DestField:
+    """One field of one MongoDB collection from `data.dest_schema.DEST_SCHEMA`.
+
+    `path` is already dot-notation for nested fields (e.g.
+    `"employment.isRemote"`) — see `data/dest_schema.py` for why the
+    nesting is flattened by hand at data-entry time rather than at runtime.
+
+    Example:
+        >>> f = DestField(collection="employees", path="employment.managerId",
+        ...               type="ObjectId", ref="employees._id")
+        >>> f.description
+        'employees.employment.managerId — ObjectId — ref -> employees._id'
+    """
+
     collection: str
     path: str
     type: str
@@ -41,6 +67,10 @@ class DestField:
 
     @property
     def description(self) -> str:
+        """Human-readable text embedded (Stage 3) and shown to the LLM
+        (Stage 4) — mirrors `SourceField.description`'s shape so both
+        sides read the same way in a prompt.
+        """
         bits = [f"{self.collection}.{self.path}", self.type]
         if self.ref:
             bits.append(f"ref -> {self.ref}")
@@ -50,6 +80,16 @@ class DestField:
 
 
 def load_source_fields() -> list[SourceField]:
+    """All 34 MySQL columns across all 3 source tables, as `SourceField`s.
+
+    Recomputed from `SOURCE_SCHEMA` on every call rather than cached — the
+    schema is ~34 small dict literals, so re-walking it is nowhere near
+    worth adding cache invalidation for.
+
+    Example:
+        >>> len(load_source_fields())
+        34
+    """
     fields = []
     for table, cols in SOURCE_SCHEMA["tables"].items():
         for col in cols:
@@ -67,6 +107,13 @@ def load_source_fields() -> list[SourceField]:
 
 
 def load_dest_fields() -> list[DestField]:
+    """All 40 MongoDB fields across all 3 destination collections, as
+    `DestField`s (nested fields already flattened to dot-paths).
+
+    Example:
+        >>> len(load_dest_fields())
+        40
+    """
     fields = []
     for collection, cols in DEST_SCHEMA["collections"].items():
         for col in cols:
@@ -81,16 +128,46 @@ def load_dest_fields() -> list[DestField]:
 
 
 def source_tables() -> list[str]:
+    """Source table names, in schema-definition order.
+
+    Example:
+        >>> source_tables()
+        ['emp_master', 'dept_info', 'locations']
+    """
     return list(SOURCE_SCHEMA["tables"].keys())
 
 
 def dest_collections() -> list[str]:
+    """Destination collection names, in schema-definition order.
+
+    Example:
+        >>> dest_collections()
+        ['employees', 'departments', 'locations']
+    """
     return list(DEST_SCHEMA["collections"].keys())
 
 
 def fields_for_table(table: str) -> list[SourceField]:
+    """All fields of one source table.
+
+    Args:
+        table: A name from `source_tables()`, e.g. "emp_master".
+
+    Example:
+        >>> len(fields_for_table("dept_info"))
+        7
+    """
     return [f for f in load_source_fields() if f.table == table]
 
 
 def fields_for_collection(collection: str) -> list[DestField]:
+    """All fields of one destination collection.
+
+    Args:
+        collection: A name from `dest_collections()`, e.g. "departments".
+
+    Example:
+        >>> len(fields_for_collection("departments"))
+        7
+    """
     return [f for f in load_dest_fields() if f.collection == collection]

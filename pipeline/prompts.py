@@ -1,4 +1,9 @@
-"""Prompt templates for Stage 4 (per-table field mapping) and Stage 7 (re-ask)."""
+"""Prompt templates for Stage 4 (per-table field mapping) and Stage 7 (re-ask).
+
+Kept as plain string-building functions rather than a templating library
+(Jinja2 etc.) — two templates, no conditionals a human wouldn't write
+inline, not worth a dependency.
+"""
 from pipeline.parse_schema import DestField, SourceField
 
 
@@ -8,6 +13,36 @@ def build_field_mapping_prompt(
     fields: list[SourceField],
     candidates: dict[str, list[tuple[DestField, float]]],
 ) -> str:
+    """Build the Stage 4 prompt for one source table.
+
+    Deliberately scoped to one table: only `fields` (that table's columns)
+    and their pre-retrieved `candidates` are included — never the sibling
+    tables or the raw destination schema. This is the prompt the
+    assignment's "no both schemas in one call" constraint is actually
+    about; see WRITEUP.md for the full reasoning.
+
+    Args:
+        table: Source table name, e.g. "emp_master".
+        collection: Destination collection name, e.g. "employees".
+        fields: That table's fields — typically `fields_for_table(table)`.
+        candidates: Per-field candidate lists from
+            `pipeline.embed_candidates.top_k_candidates`.
+
+    Returns:
+        The full prompt text, ready to pass to `LLMClient.map_fields`.
+
+    Example:
+        >>> from pipeline.parse_schema import SourceField, DestField
+        >>> fields = [SourceField(table="locations", field="tz_cd", type="VARCHAR(50)",
+        ...                       comment="IANA timezone")]
+        >>> candidates = {"tz_cd": [(DestField(collection="locations", path="timezone",
+        ...                                    type="String"), 0.66)]}
+        >>> prompt = build_field_mapping_prompt("locations", "locations", fields, candidates)
+        >>> print(prompt.splitlines()[2])
+        SOURCE TABLE: locations (legacy_hrm, MySQL)
+        >>> "tz_cd -> candidates: [timezone (String)]" in prompt
+        True
+    """
     lines = [
         "You are mapping fields from a MySQL table to their MongoDB destination.",
         "",
@@ -56,6 +91,26 @@ def build_field_mapping_prompt(
 
 
 def build_reask_prompt(field_mapping) -> str:
+    """Build the Stage 7 prompt re-examining one low-confidence field mapping.
+
+    Args:
+        field_mapping: A `pipeline.validate.FieldMapping` whose `confidence`
+            fell below `reask_low_confidence`'s threshold.
+
+    Returns:
+        The re-ask prompt text.
+
+    Example:
+        >>> from pipeline.validate import FieldMapping
+        >>> fm = FieldMapping(source_field="job_lvl_cd", destination_field="employment.jobLevel",
+        ...                    type_transform="VARCHAR -> String", confidence=0.5,
+        ...                    reasoning="uncertain guess")
+        >>> prompt = build_reask_prompt(fm)
+        >>> "0.50 confidence" in prompt
+        True
+        >>> "source_field: job_lvl_cd" in prompt
+        True
+    """
     return (
         "Re-examine this single field mapping — it previously scored "
         f"{field_mapping.confidence:.2f} confidence, below the reliability "

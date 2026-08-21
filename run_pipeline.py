@@ -28,6 +28,29 @@ OUTPUT_PATH = Path(__file__).parent / "output" / "mapping.json"
 
 
 def main() -> int:
+    """Run Stages 0-7 end to end and write `output/mapping.json`.
+
+    LLM backend selection: `--llm-backend claude` or `--llm-backend
+    ollama` forces one; omit it and the pipeline uses Claude if
+    `ANTHROPIC_API_KEY` is set (in the environment or `.env`), else falls
+    back to a local Ollama model (`--ollama-model`, default `qwen2.5:7b`)
+    with no key needed at all.
+
+    Returns:
+        `0` — a process exit code, per the `sys.exit(main())` convention
+        at the bottom of this file.
+
+    Example:
+        $ python run_pipeline.py --verbose
+        LLM backend: ollama (qwen2.5:7b)
+        emp_master -> employees: 19 mapped, 0 unmapped (table confidence 0.92)
+        dept_info -> departments: 6 mapped, 1 unmapped (table confidence 0.88)
+        locations -> locations: 7 mapped, 1 unmapped (table confidence 0.90)
+
+        Wrote /path/to/ibm_assignment/output/mapping.json
+
+        $ python run_pipeline.py --llm-backend claude --top-k 8 --confidence-threshold 0.8
+    """
     load_dotenv()
 
     parser = argparse.ArgumentParser(description="Map legacy_hrm fields to people_platform.")
