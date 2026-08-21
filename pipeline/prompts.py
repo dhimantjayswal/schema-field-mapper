@@ -31,6 +31,10 @@ def build_field_mapping_prompt(
     Returns:
         The full prompt text, ready to pass to `LLMClient.map_fields`.
 
+    The `role` shown per field (`pipeline.roles.classify_role`) is what's
+    meant to stop the model defaulting to "both are dates" reasoning — see
+    the worked `NO_MATCH` example below, which exists for the same reason.
+
     Example:
         >>> from pipeline.parse_schema import SourceField, DestField
         >>> fields = [SourceField(table="locations", field="tz_cd", type="VARCHAR(50)",
@@ -40,7 +44,7 @@ def build_field_mapping_prompt(
         >>> prompt = build_field_mapping_prompt("locations", "locations", fields, candidates)
         >>> print(prompt.splitlines()[2])
         SOURCE TABLE: locations (legacy_hrm, MySQL)
-        >>> "tz_cd -> candidates: [timezone (String)]" in prompt
+        >>> "tz_cd -> candidates: [timezone (String, role: freetext)]" in prompt
         True
     """
     lines = [
@@ -55,6 +59,7 @@ def build_field_mapping_prompt(
             bits.append("PRIMARY KEY")
         if f.fk:
             bits.append(f"FK -> {f.fk}")
+        bits.append(f"role: {f.role}")
         line = " ".join(bits)
         if f.comment:
             line += f" — {f.comment}"
@@ -68,7 +73,7 @@ def build_field_mapping_prompt(
     ]
     for f in fields:
         cand_strs = [
-            f"{d.path} ({d.type}{', ref -> ' + d.ref if d.ref else ''})"
+            f"{d.path} ({d.type}, role: {d.role}{', ref -> ' + d.ref if d.ref else ''})"
             for d, _score in candidates.get(f.field, [])
         ]
         lines.append(f"- {f.field} -> candidates: [{', '.join(cand_strs)}]")
@@ -82,7 +87,16 @@ def build_field_mapping_prompt(
         "",
         "If no candidate is a genuine match, do not include that field in "
         "field_mappings — list its name in unmapped_source_fields instead. "
-        "Never force a low-quality match just to fill the array.",
+        "Never force a low-quality match just to fill the array. Two fields "
+        "must never share the same destination_field within this response.",
+        "",
+        "Worked example of a correct NO_MATCH decision — do not repeat this "
+        "mistake: a source field 'dob' (DATE, \"date of birth\") has "
+        "candidates including 'employment.startDate' and 'meta.createdAt' — "
+        "both are dates, but neither represents a birth date. The correct "
+        "answer is to leave 'dob' out of field_mappings entirely and list it "
+        "in unmapped_source_fields, NOT to map it to a same-typed field just "
+        "because both happen to be dates.",
         "",
         f"Return only fields for the {table} table. Do not reference any other "
         "table or collection.",
