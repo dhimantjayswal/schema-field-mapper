@@ -161,34 +161,52 @@ Stage 5's completeness check is structural, not empirical), and
 `path_validity` (no hallucinated destination paths), sliced by difficulty.
 
 After the four fixes above, a real run against the local Ollama backend
-(`qwen2.5:7b`) scores:
+(`qwen2.5:7b`) scored 100% — and then a second, otherwise-identical run
+scored 91%, including a *fresh* instance of the `dob` misfire (this time
+mapped to `employment.startDate` instead of `meta.createdAt`). Neither
+Claude nor Ollama calls had `temperature=0` set. That's a real
+reproducibility bug in its own right — a mapping artifact that changes
+between identical runs can't be reviewed or diffed — and arguably a more
+important finding than either individual score: **an accuracy number
+without a pinned temperature isn't a number, it's a sample.**
+
+Pinning `temperature=0` on both backends (`pipeline/llm_client.py`) made
+two runs byte-identical (verified directly, not assumed) and the
+committed result is now stable at:
 
 ```
 $ python evaluate_mapping.py
 n:              34
-accuracy@1:     100.00%
+accuracy@1:     97.06%
 coverage:       100.00%
 path_validity:  100.00%
 
 by difficulty:
   easy     21/21  (100.00%)
   medium   11/11  (100.00%)
-  hard      2/2   (100.00%)
+  hard      1/2   (50.00%)
+
+misses:
+  dept_info.dept_stat    expected='isActive'    predicted='unmapped'
 ```
 
-Both hard cases (`dob` correctly unmapped, `dept_stat`→`isActive`) score
-correctly. Before the fixes, the same command against the previously
-committed output would have scored `dob` as a miss (mapped instead of
-unmapped) and reported a path-validity-adjacent duplicate-target bug that
-`accuracy_at_1` alone doesn't even surface — worth noting as a limitation
-of this metric set, not just a result: **accuracy@1 as computed here
-doesn't penalize a destination being claimed twice**, since it scores each
-gold source field independently. The conflict-resolution fix closes the
-underlying bug regardless, but a dedicated `no_duplicate_targets` check
-would make the eval script itself catch a regression here, not just this
-write-up's manual spot-check.
+`dob` is now reliably caught (the harder of the two original hard cases).
+The one remaining miss, `dept_stat`→`isActive`, is the pipeline correctly
+declining a genuinely lossy `CHAR→Boolean` collapse rather than guessing
+wrong — arguably the right conservative call, not a bug, though a stronger
+model (Claude) would be worth trying against the same gold set to see
+whether it closes this last gap.
 
-100% on 34 hand-labeled points from a single annotator (this session) is a
+One more limitation worth stating plainly: `accuracy_at_1` as computed
+here scores each gold source field independently, so it wouldn't by
+itself have caught the original `dob`/`created_ts` duplicate-target bug
+(both fields were individually "present," just both pointing at the same
+destination). The conflict-resolution fix in `pipeline/validate.py`
+closes the underlying bug regardless, but a dedicated
+`no_duplicate_targets` check in the eval script would let the *metric*
+catch a regression here too, not just a manual spot-check.
+
+97% on 34 hand-labeled points from a single annotator (this session) is a
 promising number, not a rigorous one — see "What's deliberately out of
 scope" below.
 
@@ -206,12 +224,45 @@ documented simplifications, not oversights.
 
 Known limitations, stated rather than hidden: the gold mapping is
 single-annotator (this session's own judgment is the ground truth, so
-100% accuracy@1 means "agrees with me," not "objectively correct"); no
+97% accuracy@1 means "agrees with me," not "objectively correct"); no
 retry/backoff on LLM calls, so a transient network error crashes the run
 rather than degrading gracefully; no response caching, so every run
 re-spends every LLM call even for unchanged fields; and the embedding
 model (`all-MiniLM-L6-v2`) is a general-purpose default, untuned for
-schema/identifier text specifically.
+schema/identifier text specifically. The MySQL/MongoDB Docker containers
+(below) are seeded from the same schema data the pipeline reads, not
+introspected live — a real migration tool would read the schema from the
+databases themselves, not from a hand-maintained Python file.
+
+## Real databases (Docker)
+
+`docker-compose.yml` runs actual MySQL and MongoDB containers, seeded via
+`docker/mysql-init/01-legacy_hrm.sql` / `docker/mongo-init/01-people_platform.js`
+— both *generated* from `data/source_schema.py` / `data/dest_schema.py`
+by `scripts/generate_db_init.py`, not hand-transcribed a third time. This
+was worth doing as generation rather than duplication for the same reason
+the pipeline itself avoids re-parsing the docx at runtime: a third manual
+copy of the same 74 fields is a third place for the three to quietly
+disagree.
+
+The MySQL DDL declares tables without foreign keys first, then adds every
+FK via `ALTER TABLE` afterward — `dept_info` and `emp_master` reference
+each other (`dept_head_id` → `emp_master.emp_id`, `dept_id` →
+`dept_info.dept_id`), so no single `CREATE TABLE` ordering can satisfy
+both inline. The MongoDB collections get a real `$jsonSchema` validator
+reconstructed from the flattened dot-paths back into their nested shape —
+verified directly against a live container: inserting a document with
+`isRemote: "not-a-bool"` is actually rejected by MongoDB, not just
+type-hinted in a comment.
+
+Writing the path-reconstruction logic surfaced a real bug before this was
+ever run against a live container: nested groups (`employment`,
+`fullName`) were being wrapped in `{bsonType: "object", properties: ...}`
+twice — once for the group itself, once again inside its own properties
+key. A test (`tests/test_generate_db_init.py`) now reconstructs every
+leaf path from the generated schema and asserts it matches the original
+flattened list exactly, for both collections, so this can't silently
+regress.
 
 ## Testing strategy
 
