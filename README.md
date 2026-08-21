@@ -14,6 +14,19 @@ first, then asks Claude to adjudicate one source table at a time against
 only its own candidates — never both full schemas in one call. Full
 reasoning in `WRITEUP.md`.
 
+## UI
+
+```bash
+streamlit run app.py
+```
+
+A dashboard, not a second implementation — it imports `pipeline/` directly
+and calls the same stages `run_pipeline.py` does. Watch the pipeline map
+each table live from the sidebar (`▶ Run pipeline`), or just browse the
+last `output/mapping.json`: per-table results with confidence bars,
+unmapped-field warnings, and the gold-mapping eval scorecard, all in one
+page instead of raw JSON + a separate `evaluate_mapping.py` call.
+
 ## Setup
 
 ```bash
