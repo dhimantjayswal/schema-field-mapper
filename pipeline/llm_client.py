@@ -120,6 +120,7 @@ class ClaudeLLMClient:
         response = self._anthropic().messages.create(
             model=self._MODEL,
             max_tokens=4096,
+            temperature=0,  # reproducibility, not speed — same input should give the same mapping
             tools=[self._TOOL_SCHEMA],
             tool_choice={"type": "tool", "name": self._TOOL_NAME},
             messages=[{"role": "user", "content": prompt}],
@@ -175,6 +176,11 @@ class OllamaLLMClient:
             "messages": [{"role": "user", "content": prompt}],
             "format": _FIELD_MAPPING_SCHEMA,
             "stream": False,
+            # temperature 0 for reproducibility, not speed — a live run
+            # without this produced a different mapping (including a fresh
+            # instance of the dob misfire) between two otherwise-identical
+            # invocations. See WRITEUP.md.
+            "options": {"temperature": 0},
         }).encode()
         request = urllib.request.Request(
             f"{self._host}/api/chat", data=payload,

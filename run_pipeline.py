@@ -61,11 +61,15 @@ def main() -> int:
                          help="defaults to claude if ANTHROPIC_API_KEY is set, else ollama")
     parser.add_argument("--ollama-model", default="qwen2.5:7b",
                          help="model tag for --llm-backend ollama (must already be pulled)")
+    parser.add_argument("--ollama-host", default="http://localhost:11434",
+                         help="Ollama API address — override to http://host.docker.internal:11434 "
+                              "when running the pipeline in Docker against an Ollama server on the host")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
     backend = args.llm_backend or ("claude" if os.environ.get("ANTHROPIC_API_KEY") else "ollama")
-    llm = ClaudeLLMClient() if backend == "claude" else OllamaLLMClient(model=args.ollama_model)
+    llm = (ClaudeLLMClient() if backend == "claude"
+           else OllamaLLMClient(model=args.ollama_model, host=args.ollama_host))
     if args.verbose:
         print(f"LLM backend: {backend}" + (f" ({args.ollama_model})" if backend == "ollama" else ""))
 
