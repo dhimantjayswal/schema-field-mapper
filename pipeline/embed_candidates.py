@@ -21,18 +21,23 @@ from typing import Protocol
 
 import numpy as np
 
+from pipeline.lexicon import expand
 from pipeline.names import tokenize
 from pipeline.parse_schema import DestField, SourceField
 
 
 def _name_overlap(source_field: str, dest_path: str) -> float:
     """Jaccard similarity between a source field name and a destination
-    path's last segment, tokenized with `pipeline.names.tokenize`.
+    path's last segment, tokenized with `pipeline.names.tokenize` and
+    expanded with `pipeline.lexicon.expand`.
 
     This is what rescues near-exact name matches (e.g. `is_remote` vs.
     `isRemote`) that a generic sentence embedding can under-rank when the
     field's type/comment text dominates the embedded string — see this
-    module's docstring for the real case that motivated it.
+    module's docstring for the real case that motivated it. Lexicon
+    expansion extends this to abbreviated matches embeddings alone also
+    miss: `tz_cd` shares no literal tokens with `timezone`, but both
+    expand to `{"timezone"}`.
 
     Args:
         source_field: A source column name, e.g. "is_remote".
@@ -40,16 +45,19 @@ def _name_overlap(source_field: str, dest_path: str) -> float:
             compared, e.g. "employment.isRemote" -> "isRemote".
 
     Returns:
-        0.0 to 1.0 — 1.0 means identical token sets, 0.0 means no shared
-        tokens (or either name tokenizes to nothing).
+        0.0 to 1.0 — 1.0 means identical expanded token sets, 0.0 means no
+        shared tokens (or either name tokenizes to nothing).
 
     Example:
         >>> _name_overlap("is_remote", "employment.isRemote")
         1.0
+        >>> round(_name_overlap("tz_cd", "timezone"), 3)
+        0.5
         >>> _name_overlap("dept_stat", "isActive")
         0.0
     """
-    a, b = set(tokenize(source_field)), set(tokenize(dest_path.rsplit(".", 1)[-1]))
+    a = set(expand(tokenize(source_field)))
+    b = set(expand(tokenize(dest_path.rsplit(".", 1)[-1])))
     if not a or not b:
         return 0.0
     return len(a & b) / len(a | b)

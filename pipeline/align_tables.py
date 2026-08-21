@@ -4,6 +4,7 @@ Only 3 source tables vs. 3 destination collections here, so a lightweight
 name + field-vocabulary overlap heuristic is used instead of an LLM call —
 see WRITEUP.md for why that's the right call at this scale.
 """
+from pipeline.lexicon import LEXICON
 from pipeline.names import tokenize
 from pipeline.parse_schema import (
     dest_collections,
@@ -13,10 +14,6 @@ from pipeline.parse_schema import (
 )
 
 _STOPWORDS = {"master", "info", "data", "tbl"}
-
-# Small, closed set of standard HR shorthand — not a general abbreviation
-# solver, just enough to bridge this assignment's actual table names.
-_ABBREVIATIONS = {"dept": "department", "emp": "employee", "loc": "location"}
 
 
 def _tokens(name: str) -> set[str]:
@@ -40,10 +37,10 @@ def _tokens(name: str) -> set[str]:
 def _name_score(table_tokens: set[str], collection: str) -> float:
     """Score how well a table's name tokens match a collection's name.
 
-    1.0 if any table token (or its `_ABBREVIATIONS` expansion) stems into
-    the collection name, else 0.0 — e.g. 'dept' expands to 'department',
-    which is a prefix of 'departments'. Plain substring matching alone
-    misses abbreviations like this.
+    1.0 if any table token (or its `pipeline.lexicon.LEXICON` expansion)
+    stems into the collection name, else 0.0 — e.g. 'dept' expands to
+    'department', which is a prefix of 'departments'. Plain substring
+    matching alone misses abbreviations like this.
 
     Args:
         table_tokens: Tokens from `_tokens(table_name)`.
@@ -63,7 +60,7 @@ def _name_score(table_tokens: set[str], collection: str) -> float:
     collection = collection.lower()
     singular = collection[:-1] if collection.endswith("s") else collection
     for token in table_tokens:
-        for candidate in (token, _ABBREVIATIONS.get(token, token)):
+        for candidate in (token, LEXICON.get(token, token)):
             if candidate in collection or singular in candidate or candidate in singular:
                 return 1.0
     return 0.0
