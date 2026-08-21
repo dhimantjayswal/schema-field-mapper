@@ -4,8 +4,7 @@ Only 3 source tables vs. 3 destination collections here, so a lightweight
 name + field-vocabulary overlap heuristic is used instead of an LLM call —
 see WRITEUP.md for why that's the right call at this scale.
 """
-import re
-
+from pipeline.names import tokenize
 from pipeline.parse_schema import (
     dest_collections,
     fields_for_collection,
@@ -21,15 +20,45 @@ _ABBREVIATIONS = {"dept": "department", "emp": "employee", "loc": "location"}
 
 
 def _tokens(name: str) -> set[str]:
-    words = re.split(r"[_\W]+", name.lower())
-    return {w for w in words if w and w not in _STOPWORDS}
+    """Tokenize a table/collection name and drop generic suffixes.
+
+    Args:
+        name: A table or collection name, e.g. "dept_info".
+
+    Returns:
+        The name's tokens with `_STOPWORDS` removed.
+
+    Example:
+        >>> _tokens("dept_info")
+        {'dept'}
+        >>> _tokens("departments")
+        {'departments'}
+    """
+    return {t for t in tokenize(name) if t not in _STOPWORDS}
 
 
 def _name_score(table_tokens: set[str], collection: str) -> float:
-    """1.0 if the table's core token (or its expansion) stems into the
-    collection name, else 0.0 — e.g. 'dept' expands to 'department', which
-    is a prefix of 'departments'. Plain substring matching alone misses
-    abbreviations like this.
+    """Score how well a table's name tokens match a collection's name.
+
+    1.0 if any table token (or its `_ABBREVIATIONS` expansion) stems into
+    the collection name, else 0.0 — e.g. 'dept' expands to 'department',
+    which is a prefix of 'departments'. Plain substring matching alone
+    misses abbreviations like this.
+
+    Args:
+        table_tokens: Tokens from `_tokens(table_name)`.
+        collection: A destination collection name, e.g. "departments".
+
+    Returns:
+        1.0 (match) or 0.0 (no match) — this is a hard yes/no signal, not
+        a graded similarity; `align_tables` blends it with field-vocabulary
+        overlap for the final score.
+
+    Example:
+        >>> _name_score({"dept"}, "departments")
+        1.0
+        >>> _name_score({"dept"}, "employees")
+        0.0
     """
     collection = collection.lower()
     singular = collection[:-1] if collection.endswith("s") else collection
@@ -41,6 +70,23 @@ def _name_score(table_tokens: set[str], collection: str) -> float:
 
 
 def align_tables() -> list[dict]:
+    """Stage 1: match each source table to its best destination collection.
+
+    Only 3-vs-3 here, so this uses a lightweight heuristic (`_name_score`
+    blended with source/destination field-name overlap) instead of an LLM
+    call — see WRITEUP.md for why that trade-off makes sense at this scale.
+
+    Returns:
+        One dict per source table, in `source_tables()` order:
+        `{"source_table", "destination_collection", "confidence", "reasoning"}`.
+        This is the outer `tables[].confidence` / `.reasoning` in the
+        final mapping document (see `pipeline.assemble.assemble`).
+
+    Example:
+        >>> alignments = align_tables()
+        >>> [(a["source_table"], a["destination_collection"]) for a in alignments]
+        [('emp_master', 'employees'), ('dept_info', 'departments'), ('locations', 'locations')]
+    """
     alignments = []
     for table in source_tables():
         table_tokens = _tokens(table)
