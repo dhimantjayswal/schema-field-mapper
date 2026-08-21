@@ -178,6 +178,18 @@ python run_pipeline.py --verbose   # now also traces to Langfuse
 Open Langfuse → Tracing to watch each table's adjudication call — full
 prompt, full response, real token counts, latency — as it happens.
 
+### Dashboards
+
+- **Langfuse → Dashboards** — ships 4 dashboards out of the box (Home,
+  Cost, Latency, Usage Management), all pre-wired to real trace data. No
+  setup needed.
+- **Grafana → Dashboards → Schema Field Mapper → LLM Operations** — calls,
+  total tokens, cost, token usage over time, calls by table, recent
+  generations. Reads Langfuse's own ClickHouse store directly
+  (`grafana-clickhouse-datasource`) — real data from every traced call,
+  no app instrumentation needed. `$0.00` cost is correct, not broken: no
+  pricing model is registered for `qwen2.5:7b` since Ollama is free/local.
+
 ## Pipeline stages
 
 | Stage | Module | LLM call? |
