@@ -102,22 +102,116 @@ is for; the cold test suite's fake embedder didn't catch it because its
 bag-of-words tokenizer happened to weight the name tokens correctly by
 construction.
 
-Two fields — `dept_stat`→`isActive` and `tz_cd`→`timezone` — are still
-left unmapped by `qwen2.5:7b` even though `timezone` is embedding-retrieved
-as the top candidate for `tz_cd` (0.665 cosine, no help from name-overlap
-since "tz" isn't a token-level match for "timezone"). That's the smaller
-local model declining to map fields it's not confident about, which is the
-pipeline behaving as designed (Stage 4's prompt explicitly says omit
-rather than force a low-quality match) — not a bug. Worth re-running
-against Claude to see whether a stronger model closes that last gap.
+## A real bug found by comparing against a reference spec, and how it was fixed
+
+A separate, far more detailed reference architecture for this exact
+assignment (received after the initial build) named three failure modes by
+description before they were ever observed here. Checking the committed
+output against it found one of them had actually happened:
+
+- `dob` and `created_ts` had both been mapped to `meta.createdAt`
+  (confidences 0.7 and 0.8) — the local model made exactly the "both are
+  dates" mistake the reference spec calls "the single most common failure
+  in naive implementations of this task," and the pipeline had no
+  mechanism to catch two source fields confidently claiming the same
+  destination.
+- `tz_cd` → `timezone` and `dept_stat` → `isActive` were going permanently
+  unmapped even though a human reads both pairs as obviously the same
+  concept — an abbreviation-expansion gap (`tz` never gets closer to
+  `timezone` on pure name overlap) rather than the model actually being
+  unsure.
+
+Four fixes closed all three, in priority order (cheapest/highest-value
+first):
+
+1. **Conflict resolution** (`pipeline/validate.py::_resolve_conflicts`) —
+   when two source fields in the same table claim the same
+   `destination_field`, keep the higher-confidence one and demote the
+   loser to `unmapped_source_fields` instead of letting both survive into
+   the output. Greedy, not a full assignment solve (e.g. Hungarian
+   algorithm) — at 34 fields a real conflict is rare and isolated, so a
+   global optimum buys nothing a local per-destination comparison doesn't
+   already get for free.
+2. **A worked `NO_MATCH` example** added to the Stage 4 prompt
+   (`pipeline/prompts.py`) — a `dob`-shaped example showing the model that
+   "both are dates" is not sufficient grounds for a match, directly
+   targeting the failure mode observed.
+3. **A structural role classifier** (`pipeline/roles.py`) — rule-based,
+   deterministic, folded into both `SourceField.description` and
+   `DestField.description` so the embedder and the LLM both see it. This
+   is specifically what's supposed to separate `hire_dt`
+   (`timestamp_business`) from `created_ts` (`timestamp_audit`) when both
+   are bare `DATETIME` columns with no comment.
+4. **A small abbreviation lexicon** (`pipeline/lexicon.py`) — `tz`→
+   `timezone`, `ctr`→`center`, `dept`→`department`, ~15 more, seeded from
+   this dataset's actual column names, not a general NLP expander. Folded
+   into the name-overlap signal in `embed_candidates.py` so `tz_cd` shares
+   an expanded token with `timezone` even though neither literally
+   contains the other.
+
+## Evaluation
+
+`data/gold_mapping.py` is a hand-curated ground truth for all 34 source
+fields (expected destination, acceptable alternatives, difficulty,
+rationale) — written from the assignment's own schemas, not from anything
+this pipeline produced, so scoring against it isn't circular.
+`pipeline/evaluate.py` / `evaluate_mapping.py` compute `accuracy@1`,
+`coverage` (every gold field accounted for — 1.0 by construction, since
+Stage 5's completeness check is structural, not empirical), and
+`path_validity` (no hallucinated destination paths), sliced by difficulty.
+
+After the four fixes above, a real run against the local Ollama backend
+(`qwen2.5:7b`) scores:
+
+```
+$ python evaluate_mapping.py
+n:              34
+accuracy@1:     100.00%
+coverage:       100.00%
+path_validity:  100.00%
+
+by difficulty:
+  easy     21/21  (100.00%)
+  medium   11/11  (100.00%)
+  hard      2/2   (100.00%)
+```
+
+Both hard cases (`dob` correctly unmapped, `dept_stat`→`isActive`) score
+correctly. Before the fixes, the same command against the previously
+committed output would have scored `dob` as a miss (mapped instead of
+unmapped) and reported a path-validity-adjacent duplicate-target bug that
+`accuracy_at_1` alone doesn't even surface — worth noting as a limitation
+of this metric set, not just a result: **accuracy@1 as computed here
+doesn't penalize a destination being claimed twice**, since it scores each
+gold source field independently. The conflict-resolution fix closes the
+underlying bug regardless, but a dedicated `no_duplicate_targets` check
+would make the eval script itself catch a regression here, not just this
+write-up's manual spot-check.
+
+100% on 34 hand-labeled points from a single annotator (this session) is a
+promising number, not a rigorous one — see "What's deliberately out of
+scope" below.
 
 ## What's deliberately out of scope
 
 No vector database — brute-force cosine similarity over ~30 destination-
 field embeddings is instant at this scale; adding one would be
 infrastructure for a problem three tables don't have. No LLM call for
-table alignment, for the same reason. Both are documented simplifications,
-not oversights.
+table alignment, for the same reason. No global assignment solver (e.g.
+Hungarian algorithm) for conflict resolution — greedy highest-confidence-
+wins is what's implemented; correct at this scale, and documented as a
+point to revisit only if a larger schema starts producing chained
+conflicts, not silently assumed sufficient forever. All three are
+documented simplifications, not oversights.
+
+Known limitations, stated rather than hidden: the gold mapping is
+single-annotator (this session's own judgment is the ground truth, so
+100% accuracy@1 means "agrees with me," not "objectively correct"); no
+retry/backoff on LLM calls, so a transient network error crashes the run
+rather than degrading gracefully; no response caching, so every run
+re-spends every LLM call even for unchanged fields; and the embedding
+model (`all-MiniLM-L6-v2`) is a general-purpose default, untuned for
+schema/identifier text specifically.
 
 ## Testing strategy
 

@@ -2,7 +2,7 @@
   "mapping_version": "1.0",
   "source": "legacy_hrm (MySQL)",
   "destination": "people_platform (MongoDB)",
-  "generated_at": "2026-08-21T14:30:39.388696+00:00",
+  "generated_at": "2026-08-21T15:14:53.077635+00:00",
   "tables": [
     {
       "source_table": "emp_master",
@@ -13,157 +13,151 @@
         {
           "source_field": "emp_id",
           "destination_field": "_id",
-          "type_transform": "INT",
+          "type_transform": "ObjectId",
           "confidence": 1.0,
-          "reasoning": "emp_id is the primary key and a good unique identifier for the document.",
-          "notes": "No transformation needed."
+          "reasoning": "emp_id is a unique identifier and is mapped directly to _id in MongoDB, which is an ObjectId.",
+          "notes": null
         },
         {
           "source_field": "emp_cd",
           "destination_field": "employeeCode",
-          "type_transform": "VARCHAR",
+          "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "emp_cd is the human-readable employee code, which best fits the 'employeeCode' field.",
-          "notes": "No transformation needed."
+          "reasoning": "emp_cd is a freetext identifier for the employee, which can be mapped directly to employeeCode in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "f_name",
           "destination_field": "fullName.firstName",
-          "type_transform": "VARCHAR",
-          "confidence": 0.8,
-          "reasoning": "f_name is the first name of the employee, which closely aligns with 'fullName.firstName'.",
-          "notes": "No transformation needed."
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "f_name is the first name of the employee, which can be mapped directly to fullName.firstName in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "l_name",
           "destination_field": "fullName.lastName",
-          "type_transform": "VARCHAR",
-          "confidence": 0.8,
-          "reasoning": "l_name is the last name of the employee, which closely aligns with 'fullName.lastName'.",
-          "notes": "No transformation needed."
-        },
-        {
-          "source_field": "dob",
-          "destination_field": "meta.createdAt",
-          "type_transform": "DATE",
-          "confidence": 0.7,
-          "reasoning": "dob is the date of birth, which is often stored as the creation date in many systems, though this might not be the most accurate match.",
-          "notes": "Consider creating a new field if 'meta.createdAt' is not the actual date of birth."
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "l_name is the last name of the employee, which can be mapped directly to fullName.lastName in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "hire_dt",
           "destination_field": "employment.startDate",
-          "type_transform": "DATE",
-          "confidence": 0.9,
-          "reasoning": "hire_dt is the date when the employee was hired, which is closely related to the 'employment.startDate' field.",
-          "notes": "No transformation needed."
+          "type_transform": "ISODate",
+          "confidence": 1.0,
+          "reasoning": "hire_dt is the date the employee was hired, which can be mapped directly to employment.startDate in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "term_dt",
           "destination_field": "employment.endDate",
-          "type_transform": "DATE",
-          "confidence": 0.9,
-          "reasoning": "term_dt is the date when the employee was terminated, which aligns with the 'employment.endDate' field.",
-          "notes": "Null if still active."
+          "type_transform": "ISODate",
+          "confidence": 1.0,
+          "reasoning": "term_dt is the date the employee was terminated, which can be mapped directly to employment.endDate in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "dept_id",
           "destination_field": "department.departmentId",
-          "type_transform": "INT",
+          "type_transform": "ObjectId",
           "confidence": 1.0,
-          "reasoning": "dept_id is the department ID, which directly maps to the 'department.departmentId' field.",
-          "notes": "No transformation needed."
+          "reasoning": "dept_id is a foreign key to the department, which can be mapped directly to department.departmentId in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "mgr_emp_id",
           "destination_field": "employment.managerId",
-          "type_transform": "INT",
+          "type_transform": "ObjectId",
           "confidence": 1.0,
-          "reasoning": "mgr_emp_id is the manager's employee ID, which best fits the 'employment.managerId' field.",
-          "notes": "No transformation needed."
+          "reasoning": "mgr_emp_id is a foreign key to the manager's employee ID, which can be mapped directly to employment.managerId in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "job_lvl_cd",
           "destination_field": "employment.jobLevel",
-          "type_transform": "VARCHAR",
-          "confidence": 0.8,
-          "reasoning": "job_lvl_cd is the job level code, which closely aligns with the 'employment.jobLevel' field.",
-          "notes": "No transformation needed."
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "job_lvl_cd is the job level code of the employee, which can be mapped directly to employment.jobLevel in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "base_sal",
           "destination_field": "compensation.baseSalary",
-          "type_transform": "DECIMAL",
-          "confidence": 0.9,
-          "reasoning": "base_sal is the base salary, which directly maps to the 'compensation.baseSalary' field.",
-          "notes": "No transformation needed."
+          "type_transform": "Number",
+          "confidence": 1.0,
+          "reasoning": "base_sal is the base salary of the employee, which can be mapped directly to compensation.baseSalary in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "sal_currency",
           "destination_field": "compensation.currency",
-          "type_transform": "CHAR",
-          "confidence": 0.9,
-          "reasoning": "sal_currency is the currency code, which directly maps to the 'compensation.currency' field.",
-          "notes": "No transformation needed."
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "sal_currency is the currency of the salary, which can be mapped directly to compensation.currency in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "work_email",
           "destination_field": "contact.email",
-          "type_transform": "VARCHAR",
-          "confidence": 0.8,
-          "reasoning": "work_email is the work email, which closely aligns with the 'contact.email' field.",
-          "notes": "No transformation needed."
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "work_email is the work email of the employee, which can be mapped directly to contact.email in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "work_phone",
           "destination_field": "contact.phone",
-          "type_transform": "VARCHAR",
-          "confidence": 0.8,
-          "reasoning": "work_phone is the work phone number, which closely aligns with the 'contact.phone' field.",
-          "notes": "No transformation needed."
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "work_phone is the work phone of the employee, which can be mapped directly to contact.phone in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "office_loc_id",
           "destination_field": "location.locationId",
-          "type_transform": "INT",
-          "confidence": 0.8,
-          "reasoning": "office_loc_id is the office location ID, which closely aligns with the 'location.locationId' field.",
-          "notes": "No transformation needed."
+          "type_transform": "ObjectId",
+          "confidence": 1.0,
+          "reasoning": "office_loc_id is a foreign key to the office location, which can be mapped directly to location.locationId in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "is_remote",
           "destination_field": "employment.isRemote",
-          "type_transform": "BOOLEAN",
-          "confidence": 0.8,
-          "reasoning": "is_remote is the boolean flag for remote work, which closely aligns with the 'employment.isRemote' field.",
-          "notes": "0 maps to false, 1 maps to true."
+          "type_transform": "Boolean",
+          "confidence": 1.0,
+          "reasoning": "is_remote is a boolean flag indicating if the employee is remote, which can be mapped directly to employment.isRemote in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "rec_stat",
           "destination_field": "employment.status",
-          "type_transform": "CHAR",
-          "confidence": 0.8,
-          "reasoning": "rec_stat is the record status, which closely aligns with the 'employment.status' field.",
-          "notes": "A=Active, I=Inactive, T=Terminated."
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "rec_stat is the record status of the employee, which can be mapped directly to employment.status in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "created_ts",
           "destination_field": "meta.createdAt",
-          "type_transform": "DATETIME",
-          "confidence": 0.8,
-          "reasoning": "created_ts is the record creation timestamp, which closely aligns with the 'meta.createdAt' field.",
-          "notes": "No transformation needed."
+          "type_transform": "ISODate",
+          "confidence": 1.0,
+          "reasoning": "created_ts is the timestamp of record creation, which can be mapped directly to meta.createdAt in the destination collection.",
+          "notes": null
         },
         {
           "source_field": "updated_ts",
           "destination_field": "meta.updatedAt",
-          "type_transform": "DATETIME",
-          "confidence": 0.8,
-          "reasoning": "updated_ts is the last update timestamp, which closely aligns with the 'meta.updatedAt' field.",
-          "notes": "No transformation needed."
+          "type_transform": "ISODate",
+          "confidence": 1.0,
+          "reasoning": "updated_ts is the timestamp of the last update, which can be mapped directly to meta.updatedAt in the destination collection.",
+          "notes": null
         }
       ],
-      "unmapped_source_fields": [],
+      "unmapped_source_fields": [
+        "dob"
+      ],
       "unmapped_destination_fields": [
         "department.code",
         "department.name",
@@ -185,15 +179,15 @@
           "destination_field": "_id",
           "type_transform": "INT -> ObjectId",
           "confidence": 0.9,
-          "reasoning": "dept_id is the primary key and can be directly mapped to the _id field in MongoDB.",
+          "reasoning": "dept_id is the primary key and identifier for the department, matching the _id field in MongoDB.",
           "notes": null
         },
         {
           "source_field": "dept_cd",
           "destination_field": "code",
           "type_transform": "VARCHAR(20) -> String",
-          "confidence": 0.85,
-          "reasoning": "dept_cd is a unique identifier and can be mapped to the code field, which is a String in the destination.",
+          "confidence": 0.8,
+          "reasoning": "dept_cd seems to be a freetext code, which can be represented by the 'code' field in the destination.",
           "notes": null
         },
         {
@@ -201,40 +195,44 @@
           "destination_field": "name",
           "type_transform": "VARCHAR(100) -> String",
           "confidence": 0.9,
-          "reasoning": "dept_nm is the department name and can be directly mapped to the name field in the destination.",
+          "reasoning": "dept_nm is the department name, which is best represented by the 'name' field in the destination.",
           "notes": null
         },
         {
           "source_field": "parent_dept_id",
           "destination_field": "parentDepartmentId",
           "type_transform": "INT -> ObjectId",
-          "confidence": 0.9,
-          "reasoning": "parent_dept_id is a foreign key to dept_id and can be mapped to the parentDepartmentId field, which is an ObjectId referencing the same collection.",
+          "confidence": 0.8,
+          "reasoning": "parent_dept_id references the primary key of another department, which aligns with the 'parentDepartmentId' field.",
           "notes": null
         },
         {
           "source_field": "dept_head_id",
           "destination_field": "headEmployeeId",
           "type_transform": "INT -> ObjectId",
-          "confidence": 0.9,
-          "reasoning": "dept_head_id is a foreign key to emp_master.emp_id and can be mapped to the headEmployeeId field, which is an ObjectId referencing the employees collection.",
+          "confidence": 0.8,
+          "reasoning": "dept_head_id references the employee ID, which can be mapped to the 'headEmployeeId' field in the destination.",
           "notes": null
         },
         {
           "source_field": "cost_ctr_cd",
           "destination_field": "costCenterCode",
           "type_transform": "VARCHAR(20) -> String",
-          "confidence": 0.85,
-          "reasoning": "cost_ctr_cd is the finance cost center code and can be mapped to the costCenterCode field, which is a String in the destination.",
+          "confidence": 0.8,
+          "reasoning": "cost_ctr_cd appears to be a finance cost center code, which can be mapped to the 'costCenterCode' field in the destination.",
+          "notes": null
+        },
+        {
+          "source_field": "dept_stat",
+          "destination_field": "isActive",
+          "type_transform": "CHAR(1) -> Boolean",
+          "confidence": 0.8,
+          "reasoning": "dept_stat is an enum_code representing active or inactive status, which can be mapped to the 'isActive' field.",
           "notes": null
         }
       ],
-      "unmapped_source_fields": [
-        "dept_stat"
-      ],
-      "unmapped_destination_fields": [
-        "isActive"
-      ]
+      "unmapped_source_fields": [],
+      "unmapped_destination_fields": []
     },
     {
       "source_table": "locations",
@@ -247,7 +245,7 @@
           "destination_field": "_id",
           "type_transform": "ObjectId",
           "confidence": 1.0,
-          "reasoning": "Primary key in the source table maps directly to the document ID in MongoDB.",
+          "reasoning": "loc_id is the primary key and is best mapped to _id in MongoDB.",
           "notes": null
         },
         {
@@ -255,7 +253,7 @@
           "destination_field": "code",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "Location code is the most likely candidate for the code field.",
+          "reasoning": "loc_cd is best matched to the 'code' field as it is a freetext identifier.",
           "notes": null
         },
         {
@@ -263,7 +261,7 @@
           "destination_field": "name",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "Location name is the most suitable candidate for the name field.",
+          "reasoning": "loc_nm is the name of the location and best fits into the 'name' field.",
           "notes": null
         },
         {
@@ -271,7 +269,7 @@
           "destination_field": "city",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "City is the most appropriate candidate for the city field.",
+          "reasoning": "city is best matched to the 'city' field as it contains the city name.",
           "notes": null
         },
         {
@@ -279,7 +277,7 @@
           "destination_field": "stateOrProvince",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "State/Province is the most suitable candidate for the stateOrProvince field.",
+          "reasoning": "state_prov is best matched to the 'stateOrProvince' field as it contains the state or province name.",
           "notes": null
         },
         {
@@ -287,7 +285,7 @@
           "destination_field": "country",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "Country code is the most appropriate candidate for the country field.",
+          "reasoning": "country_cd is best matched to the 'country' field as it is the ISO 3166-1 alpha-2 code for the country.",
           "notes": null
         },
         {
@@ -295,16 +293,20 @@
           "destination_field": "postalCode",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "Postal code is the most suitable candidate for the postalCode field.",
+          "reasoning": "postal_cd is best matched to the 'postalCode' field as it contains the postal code.",
+          "notes": null
+        },
+        {
+          "source_field": "tz_cd",
+          "destination_field": "timezone",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "tz_cd is best matched to the 'timezone' field as it contains the IANA timezone code.",
           "notes": null
         }
       ],
-      "unmapped_source_fields": [
-        "tz_cd"
-      ],
-      "unmapped_destination_fields": [
-        "timezone"
-      ]
+      "unmapped_source_fields": [],
+      "unmapped_destination_fields": []
     }
   ]
 }
