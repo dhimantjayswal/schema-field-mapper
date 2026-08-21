@@ -76,6 +76,41 @@ left alone.
   explicit `A→active, I→inactive, T→terminated` lookup in `notes`, not
   just a reasoning sentence describing that a lookup exists.
 
+## Local model support (Ollama)
+
+The LLM client sits behind a `Protocol` (`LLMClient.map_fields`), so Stage
+4/7 can run against either Claude (the primary design target — real
+tool-forced structured output) or a local Ollama model, with the same JSON
+schema enforced both ways (Ollama's `format` field accepts a JSON schema
+and constrains generation to match it). `run_pipeline.py` auto-selects
+Ollama when `ANTHROPIC_API_KEY` isn't set, so the pipeline is fully
+runnable end-to-end with no paid API access — relevant since this
+environment doesn't have Gen AI API credits. `output/mapping.json` in this
+repo was generated this way, against `qwen2.5:7b`.
+
+Running it against real data this way surfaced a genuine retrieval bug:
+`is_remote` → `employment.isRemote` is a near-exact name match, but
+MiniLM's embedding of the full `description` string (`"emp_master.is_remote
+— TINYINT(1) — 0 or 1"`) ranked it 18th of 25 destination candidates
+(score 0.058) — the type/comment tokens drowned out the field-name signal,
+so the LLM never even saw the correct field as an option and picked `_id`
+instead. Fixed by blending cosine similarity with a literal name-overlap
+score (Jaccard over `snake_case`/`camelCase`-tokenized field names) in
+`top_k_candidates` — `employment.isRemote` now ranks first. This is
+exactly the kind of thing "test it against the real data, not just fakes"
+is for; the cold test suite's fake embedder didn't catch it because its
+bag-of-words tokenizer happened to weight the name tokens correctly by
+construction.
+
+Two fields — `dept_stat`→`isActive` and `tz_cd`→`timezone` — are still
+left unmapped by `qwen2.5:7b` even though `timezone` is embedding-retrieved
+as the top candidate for `tz_cd` (0.665 cosine, no help from name-overlap
+since "tz" isn't a token-level match for "timezone"). That's the smaller
+local model declining to map fields it's not confident about, which is the
+pipeline behaving as designed (Stage 4's prompt explicitly says omit
+rather than force a low-quality match) — not a bug. Worth re-running
+against Claude to see whether a stronger model closes that last gap.
+
 ## What's deliberately out of scope
 
 No vector database — brute-force cosine similarity over ~30 destination-
