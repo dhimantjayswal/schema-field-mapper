@@ -1,0 +1,310 @@
+{
+  "mapping_version": "1.0",
+  "source": "legacy_hrm (MySQL)",
+  "destination": "people_platform (MongoDB)",
+  "generated_at": "2026-08-21T14:25:48.248695+00:00",
+  "tables": [
+    {
+      "source_table": "emp_master",
+      "destination_collection": "employees",
+      "confidence": 0.92,
+      "reasoning": "'emp_master' and 'employees' share overlapping name tokens and field vocabulary consistent with representing the same entity.",
+      "field_mappings": [
+        {
+          "source_field": "emp_id",
+          "destination_field": "_id",
+          "type_transform": "ObjectId",
+          "confidence": 1.0,
+          "reasoning": "emp_id is the primary key and is a good candidate for the MongoDB _id field, which is also an ObjectId.",
+          "notes": ""
+        },
+        {
+          "source_field": "emp_cd",
+          "destination_field": "employeeCode",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "emp_cd is a human-readable employee code and the employeeCode field is the closest match.",
+          "notes": ""
+        },
+        {
+          "source_field": "f_name",
+          "destination_field": "fullName.firstName",
+          "type_transform": "String",
+          "confidence": 0.9,
+          "reasoning": "f_name is the first name and the closest match is fullName.firstName.",
+          "notes": ""
+        },
+        {
+          "source_field": "l_name",
+          "destination_field": "fullName.lastName",
+          "type_transform": "String",
+          "confidence": 0.9,
+          "reasoning": "l_name is the last name and the closest match is fullName.lastName.",
+          "notes": ""
+        },
+        {
+          "source_field": "dob",
+          "destination_field": "meta.createdAt",
+          "type_transform": "ISODate",
+          "confidence": 0.7,
+          "reasoning": "dob is the date of birth and the closest match is meta.createdAt, which could be the record creation timestamp.",
+          "notes": ""
+        },
+        {
+          "source_field": "hire_dt",
+          "destination_field": "employment.startDate",
+          "type_transform": "ISODate",
+          "confidence": 0.8,
+          "reasoning": "hire_dt is the hire date and the closest match is employment.startDate.",
+          "notes": ""
+        },
+        {
+          "source_field": "term_dt",
+          "destination_field": "employment.endDate",
+          "type_transform": "ISODate",
+          "confidence": 0.8,
+          "reasoning": "term_dt is the termination date and the closest match is employment.endDate.",
+          "notes": ""
+        },
+        {
+          "source_field": "dept_id",
+          "destination_field": "department.departmentId",
+          "type_transform": "ObjectId",
+          "confidence": 1.0,
+          "reasoning": "dept_id is a foreign key to the department and the closest match is department.departmentId.",
+          "notes": ""
+        },
+        {
+          "source_field": "mgr_emp_id",
+          "destination_field": "employment.managerId",
+          "type_transform": "ObjectId",
+          "confidence": 0.9,
+          "reasoning": "mgr_emp_id is the manager's employee ID and the closest match is employment.managerId.",
+          "notes": ""
+        },
+        {
+          "source_field": "job_lvl_cd",
+          "destination_field": "employment.jobLevel",
+          "type_transform": "String",
+          "confidence": 0.9,
+          "reasoning": "job_lvl_cd is the job level code and the closest match is employment.jobLevel.",
+          "notes": ""
+        },
+        {
+          "source_field": "base_sal",
+          "destination_field": "compensation.baseSalary",
+          "type_transform": "Number",
+          "confidence": 0.8,
+          "reasoning": "base_sal is the base salary and the closest match is compensation.baseSalary.",
+          "notes": ""
+        },
+        {
+          "source_field": "sal_currency",
+          "destination_field": "compensation.currency",
+          "type_transform": "String",
+          "confidence": 0.8,
+          "reasoning": "sal_currency is the salary currency and the closest match is compensation.currency.",
+          "notes": ""
+        },
+        {
+          "source_field": "work_email",
+          "destination_field": "contact.email",
+          "type_transform": "String",
+          "confidence": 0.9,
+          "reasoning": "work_email is the work email and the closest match is contact.email.",
+          "notes": ""
+        },
+        {
+          "source_field": "work_phone",
+          "destination_field": "contact.phone",
+          "type_transform": "String",
+          "confidence": 0.8,
+          "reasoning": "work_phone is the work phone number and the closest match is contact.phone.",
+          "notes": ""
+        },
+        {
+          "source_field": "office_loc_id",
+          "destination_field": "location.locationId",
+          "type_transform": "ObjectId",
+          "confidence": 1.0,
+          "reasoning": "office_loc_id is a foreign key to the location and the closest match is location.locationId.",
+          "notes": ""
+        },
+        {
+          "source_field": "is_remote",
+          "destination_field": "employment.isRemote",
+          "type_transform": "Boolean",
+          "confidence": 0.9,
+          "reasoning": "is_remote is the remote status and the closest match is employment.isRemote.",
+          "notes": ""
+        },
+        {
+          "source_field": "rec_stat",
+          "destination_field": "employment.status",
+          "type_transform": "String",
+          "confidence": 0.9,
+          "reasoning": "rec_stat is the record status and the closest match is employment.status.",
+          "notes": ""
+        },
+        {
+          "source_field": "created_ts",
+          "destination_field": "meta.createdAt",
+          "type_transform": "ISODate",
+          "confidence": 0.8,
+          "reasoning": "created_ts is the record creation timestamp and the closest match is meta.createdAt.",
+          "notes": ""
+        },
+        {
+          "source_field": "updated_ts",
+          "destination_field": "meta.updatedAt",
+          "type_transform": "ISODate",
+          "confidence": 0.8,
+          "reasoning": "updated_ts is the last update timestamp and the closest match is meta.updatedAt.",
+          "notes": ""
+        }
+      ],
+      "unmapped_source_fields": [],
+      "unmapped_destination_fields": [
+        "department.code",
+        "department.name",
+        "location.city",
+        "location.code",
+        "location.country",
+        "location.name",
+        "location.timezone"
+      ]
+    },
+    {
+      "source_table": "dept_info",
+      "destination_collection": "departments",
+      "confidence": 0.88,
+      "reasoning": "'dept_info' and 'departments' share overlapping name tokens and field vocabulary consistent with representing the same entity.",
+      "field_mappings": [
+        {
+          "source_field": "dept_id",
+          "destination_field": "_id",
+          "type_transform": "INT -> ObjectId",
+          "confidence": 1.0,
+          "reasoning": "dept_id is the primary key and best matches _id in the destination collection.",
+          "notes": "No additional transformation is needed."
+        },
+        {
+          "source_field": "dept_cd",
+          "destination_field": "code",
+          "type_transform": "VARCHAR -> String",
+          "confidence": 1.0,
+          "reasoning": "dept_cd is a code and matches the code field in the candidate list.",
+          "notes": "No additional transformation is needed."
+        },
+        {
+          "source_field": "dept_nm",
+          "destination_field": "name",
+          "type_transform": "VARCHAR -> String",
+          "confidence": 1.0,
+          "reasoning": "dept_nm is the department name and matches the name field in the candidate list.",
+          "notes": "No additional transformation is needed."
+        },
+        {
+          "source_field": "parent_dept_id",
+          "destination_field": "parentDepartmentId",
+          "type_transform": "INT -> ObjectId",
+          "confidence": 1.0,
+          "reasoning": "parent_dept_id references dept_id and matches the parentDepartmentId field in the candidate list.",
+          "notes": "No additional transformation is needed."
+        },
+        {
+          "source_field": "dept_head_id",
+          "destination_field": "headEmployeeId",
+          "type_transform": "INT -> ObjectId",
+          "confidence": 1.0,
+          "reasoning": "dept_head_id references emp_id and matches the headEmployeeId field in the candidate list.",
+          "notes": "No additional transformation is needed."
+        },
+        {
+          "source_field": "cost_ctr_cd",
+          "destination_field": "costCenterCode",
+          "type_transform": "VARCHAR -> String",
+          "confidence": 1.0,
+          "reasoning": "cost_ctr_cd is a finance cost center code and matches the costCenterCode field in the candidate list.",
+          "notes": "No additional transformation is needed."
+        }
+      ],
+      "unmapped_source_fields": [
+        "dept_stat"
+      ],
+      "unmapped_destination_fields": [
+        "isActive"
+      ]
+    },
+    {
+      "source_table": "locations",
+      "destination_collection": "locations",
+      "confidence": 0.9,
+      "reasoning": "'locations' and 'locations' share overlapping name tokens and field vocabulary consistent with representing the same entity.",
+      "field_mappings": [
+        {
+          "source_field": "loc_id",
+          "destination_field": "_id",
+          "type_transform": "ObjectId",
+          "confidence": 1.0,
+          "reasoning": "Primary key mapping, loc_id is a unique identifier for locations.",
+          "notes": null
+        },
+        {
+          "source_field": "loc_cd",
+          "destination_field": "code",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "loc_cd is a unique identifier for locations and matches the code field best.",
+          "notes": null
+        },
+        {
+          "source_field": "loc_nm",
+          "destination_field": "name",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "loc_nm is the name of the location and matches the name field best.",
+          "notes": null
+        },
+        {
+          "source_field": "city",
+          "destination_field": "city",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "city field directly matches the city field.",
+          "notes": null
+        },
+        {
+          "source_field": "state_prov",
+          "destination_field": "stateOrProvince",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "state_prov field directly matches the stateOrProvince field.",
+          "notes": null
+        },
+        {
+          "source_field": "country_cd",
+          "destination_field": "country",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "country_cd is the ISO 3166-1 alpha-2 code and matches the country field best.",
+          "notes": null
+        },
+        {
+          "source_field": "postal_cd",
+          "destination_field": "postalCode",
+          "type_transform": "String",
+          "confidence": 1.0,
+          "reasoning": "postal_cd field directly matches the postalCode field.",
+          "notes": null
+        }
+      ],
+      "unmapped_source_fields": [
+        "tz_cd"
+      ],
+      "unmapped_destination_fields": [
+        "timezone"
+      ]
+    }
+  ]
+}
