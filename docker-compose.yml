@@ -1,0 +1,62 @@
+# Makes the assignment's "two database schemas from separate systems"
+# framing literal: real MySQL and MongoDB containers, seeded from the same
+# schema data the pipeline reads (see scripts/generate_db_init.py — the
+# seed scripts under docker/mysql-init and docker/mongo-init are generated
+# from data/source_schema.py and data/dest_schema.py, not hand-duplicated).
+#
+# The pipeline itself still maps from those schema files directly, not by
+# introspecting the live databases — that's a separate, larger feature.
+# These containers exist so the two schemas can be inspected/queried as
+# real running systems during a demo, not just read as JSON.
+#
+# Usage:
+#   docker compose up -d              # start MySQL + MongoDB only
+#   docker compose run --rm pipeline  # run the mapper (needs the above healthy)
+#   docker compose down -v            # stop and wipe the seeded data
+
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: legacy_hrm
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_DATABASE: people_platform
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./docker/mongo-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Not started by `docker compose up` alone (needs a build + an LLM
+  # backend) — run explicitly with `docker compose run --rm pipeline`.
+  pipeline:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    command: ["--verbose", "--ollama-host", "http://host.docker.internal:11434"]
+    volumes:
+      - ./output:/app/output
