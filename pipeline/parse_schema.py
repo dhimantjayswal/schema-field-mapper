@@ -15,8 +15,10 @@ class SourceField:
     Example:
         >>> f = SourceField(table="emp_master", field="rec_stat", type="CHAR(1)",
         ...                 comment="A=Active, I=Inactive, T=Terminated")
+        >>> f.role
+        'enum_code'
         >>> f.description
-        'emp_master.rec_stat — CHAR(1) — A=Active, I=Inactive, T=Terminated'
+        'emp_master.rec_stat — CHAR(1) — role: enum_code — A=Active, I=Inactive, T=Terminated'
     """
 
     table: str
@@ -29,16 +31,26 @@ class SourceField:
     comment: Optional[str] = None
 
     @property
+    def role(self) -> str:
+        """Structural role from `pipeline.roles.classify_role` — e.g. this
+        is what tells `hire_dt` (timestamp_business) apart from
+        `created_ts` (timestamp_audit) when both are DATETIME.
+        """
+        from pipeline.roles import classify_role
+        return classify_role(self.field, self.type, self.comment, pk=self.pk, fk=self.fk)
+
+    @property
     def description(self) -> str:
         """Human-readable text embedded (Stage 3) and shown to the LLM
-        (Stage 4) — includes the PK/FK/comment context that carries most
-        of the field's semantic signal.
+        (Stage 4) — includes the PK/FK/role/comment context that carries
+        most of the field's semantic signal.
         """
         bits = [f"{self.table}.{self.field}", self.type]
         if self.pk:
             bits.append("PRIMARY KEY")
         if self.fk:
             bits.append(f"FK -> {self.fk}")
+        bits.append(f"role: {self.role}")
         if self.comment:
             bits.append(self.comment)
         return " — ".join(bits)
@@ -55,8 +67,10 @@ class DestField:
     Example:
         >>> f = DestField(collection="employees", path="employment.managerId",
         ...               type="ObjectId", ref="employees._id")
+        >>> f.role
+        'foreign_key'
         >>> f.description
-        'employees.employment.managerId — ObjectId — ref -> employees._id'
+        'employees.employment.managerId — ObjectId — role: foreign_key — ref -> employees._id'
     """
 
     collection: str
@@ -66,12 +80,21 @@ class DestField:
     comment: Optional[str] = None
 
     @property
+    def role(self) -> str:
+        """Structural role from `pipeline.roles.classify_role`, computed
+        from this field's last path segment (`ref` doubles as the
+        foreign-key signal on this side)."""
+        from pipeline.roles import classify_role
+        return classify_role(self.path.rsplit(".", 1)[-1], self.type, self.comment, fk=self.ref)
+
+    @property
     def description(self) -> str:
         """Human-readable text embedded (Stage 3) and shown to the LLM
         (Stage 4) — mirrors `SourceField.description`'s shape so both
         sides read the same way in a prompt.
         """
         bits = [f"{self.collection}.{self.path}", self.type]
+        bits.append(f"role: {self.role}")
         if self.ref:
             bits.append(f"ref -> {self.ref}")
         if self.comment:
