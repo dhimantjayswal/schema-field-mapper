@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+*.egg-info/
+.DS_Store
+.claude/
+
+# Original assignment materials (recruiter correspondence, employer's docx) —
+# kept locally for reference, not published in this public submission repo.
+details.txt
+InterviewAssignment.docx
+~$*.doc*
