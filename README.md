@@ -147,8 +147,36 @@ each with acceptance criteria — start at Phase P0, `trace_id` propagation
 is the one thing everything else compounds off of.
 
 `deploy/observability/` has the local dev stack for Phase P0 (OTel
-Collector, Prometheus, Grafana, Loki, Tempo, Langfuse, LiteLLM) — not yet
-wired to the application code; that's P0-1 through P0-5 in the backlog.
+Collector, Prometheus, Grafana, Loki, Tempo, Langfuse, LiteLLM). **P0-5
+(Langfuse tracing) is wired up and working** — real prompts, responses,
+and token counts from actual pipeline runs. The rest (P0-1 through P0-3:
+structured logging, OTel spans, the metrics catalogue) is still open.
+
+### Start it
+
+```bash
+cd deploy/observability
+docker compose up -d
+```
+
+First boot takes a minute (ClickHouse/Postgres migrations). Then:
+
+| Service | URL | Notes |
+|---|---|---|
+| Langfuse | http://localhost:3001 | Sign up, create a project, copy its API keys |
+| Grafana | http://localhost:3000 | admin/admin, or anonymous (pre-configured) |
+| Prometheus | http://localhost:9090 | Scraping the OTel Collector |
+| MinIO console | http://localhost:9001 | minio/miniosecret |
+
+Put the Langfuse keys in `.env` (see `.env.example`) — `run_pipeline.py`
+auto-enables tracing when `LANGFUSE_PUBLIC_KEY` is set:
+
+```bash
+python run_pipeline.py --verbose   # now also traces to Langfuse
+```
+
+Open Langfuse → Tracing to watch each table's adjudication call — full
+prompt, full response, real token counts, latency — as it happens.
 
 ## Pipeline stages
 
