@@ -6,3 +6,4 @@ python-dotenv>=1.0
 pytest>=8.0
 streamlit>=1.37
 pandas>=2.2
+langfuse>=3.0

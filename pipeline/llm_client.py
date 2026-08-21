@@ -6,7 +6,10 @@ pipeline never needs network access or an API key to be exercised cold.
 Two real implementations: Claude (paid API, the primary design target) and
 Ollama (a local model, no API key or cost — see WRITEUP.md for why this
 exists). Both are handed the same JSON schema so either produces identical
-output shape.
+output shape. `LangfuseTracedLLMClient` wraps either one to send real
+prompts/responses/token counts to a Langfuse instance — see
+deploy/observability/ and docs/production/PROD-IMPLEMENTATION-BACKLOG.md
+item P0-5.
 """
 import json
 import os
@@ -102,6 +105,10 @@ class ClaudeLLMClient:
                 "or pass api_key= explicitly."
             )
         self._client = None
+        #: Token usage from the most recent `map_fields` call —
+        #: `{"input": int, "output": int}`. Read by `LangfuseTracedLLMClient`
+        #: for real token accounting; `None` until the first call completes.
+        self.last_usage: Optional[dict] = None
 
     def _anthropic(self):
         """Lazily construct the `anthropic.Anthropic` client (avoids the
@@ -125,6 +132,10 @@ class ClaudeLLMClient:
             tool_choice={"type": "tool", "name": self._TOOL_NAME},
             messages=[{"role": "user", "content": prompt}],
         )
+        self.last_usage = {
+            "input": response.usage.input_tokens,
+            "output": response.usage.output_tokens,
+        }
         for block in response.content:
             if block.type == "tool_use" and block.name == self._TOOL_NAME:
                 return block.input
@@ -161,6 +172,9 @@ class OllamaLLMClient:
         """
         self._model = model
         self._host = host.rstrip("/")
+        #: See `ClaudeLLMClient.last_usage` — same shape, sourced from
+        #: Ollama's `prompt_eval_count`/`eval_count` response fields.
+        self.last_usage: Optional[dict] = None
 
     def map_fields(self, prompt: str) -> dict:
         """See `LLMClient.map_fields`.
@@ -194,4 +208,59 @@ class OllamaLLMClient:
                 f"Couldn't reach Ollama at {self._host} — is `ollama serve` running "
                 f"and is `{self._model}` pulled (`ollama pull {self._model}`)?"
             ) from exc
+        self.last_usage = {
+            "input": body.get("prompt_eval_count", 0),
+            "output": body.get("eval_count", 0),
+        }
         return json.loads(body["message"]["content"])
+
+
+class LangfuseTracedLLMClient:
+    """Wraps any `LLMClient` with Langfuse tracing — one generation per
+    call, recording the prompt, response, model, and token usage from the
+    wrapped client's `last_usage`.
+
+    Reads `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST`
+    from the environment via the Langfuse SDK's own convention (loaded
+    from `.env` by `python-dotenv` before this is constructed). Points at
+    `deploy/observability`'s self-hosted Langfuse by default
+    (`LANGFUSE_HOST=http://localhost:3001`).
+
+    Example:
+        >>> from tests.fakes import FakeLLMClient
+        >>> client = LangfuseTracedLLMClient(FakeLLMClient(), name="adjudicate", model="fake")  # doctest: +SKIP
+        >>> client.map_fields("...")  # doctest: +SKIP
+        {'field_mappings': [...], 'unmapped_source_fields': [...]}
+    """
+
+    def __init__(self, inner: LLMClient, name: str, model: str) -> None:
+        """
+        Args:
+            inner: The real client to wrap — `ClaudeLLMClient` or `OllamaLLMClient`.
+            name: Generation name shown in the Langfuse UI, e.g. the source
+                table being adjudicated (`"adjudicate:emp_master"`).
+            model: Model identifier recorded on the generation, for the
+                per-model breakdowns in Langfuse's dashboards.
+        """
+        from langfuse import Langfuse
+        self._inner = inner
+        self._name = name
+        self._model = model
+        self._langfuse = Langfuse()
+
+    def map_fields(self, prompt: str) -> dict:
+        """See `LLMClient.map_fields`. Traces the call as a Langfuse
+        generation, then flushes immediately — this pipeline is a short
+        batch job, not a long-lived server, so nothing else guarantees the
+        background sender thread gets to run before the process exits."""
+        with self._langfuse.start_as_current_generation(
+            name=self._name, input=prompt, model=self._model,
+        ) as generation:
+            result = self._inner.map_fields(prompt)
+            usage = getattr(self._inner, "last_usage", None)
+            generation.update(
+                output=result,
+                usage_details=usage or {},
+            )
+        self._langfuse.flush()
+        return result

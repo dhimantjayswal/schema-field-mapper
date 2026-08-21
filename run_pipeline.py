@@ -19,7 +19,7 @@ from dotenv import load_dotenv
 from pipeline.align_tables import align_tables
 from pipeline.assemble import assemble
 from pipeline.embed_candidates import SentenceTransformerEmbedder
-from pipeline.llm_client import ClaudeLLMClient, OllamaLLMClient
+from pipeline.llm_client import ClaudeLLMClient, LangfuseTracedLLMClient, OllamaLLMClient
 from pipeline.map_fields import map_table
 from pipeline.reask import reask_low_confidence
 from pipeline.validate import validate_table_mapping
@@ -68,21 +68,33 @@ def main() -> int:
     args = parser.parse_args()
 
     backend = args.llm_backend or ("claude" if os.environ.get("ANTHROPIC_API_KEY") else "ollama")
+    model_name = "claude-sonnet-4-5" if backend == "claude" else args.ollama_model
     llm = (ClaudeLLMClient() if backend == "claude"
            else OllamaLLMClient(model=args.ollama_model, host=args.ollama_host))
     if args.verbose:
         print(f"LLM backend: {backend}" + (f" ({args.ollama_model})" if backend == "ollama" else ""))
 
+    # Auto-traces to Langfuse (deploy/observability) when its keys are set,
+    # same auto-detect-from-environment pattern as the backend choice above.
+    langfuse_enabled = bool(os.environ.get("LANGFUSE_PUBLIC_KEY"))
+    if langfuse_enabled and args.verbose:
+        print(f"Langfuse tracing: enabled ({os.environ.get('LANGFUSE_HOST', 'https://cloud.langfuse.com')})")
+
     embedder = SentenceTransformerEmbedder()
 
     tables = []
     for alignment in align_tables():
+        table_name = alignment["source_table"]
+        table_llm = (
+            LangfuseTracedLLMClient(llm, name=f"adjudicate:{table_name}", model=model_name)
+            if langfuse_enabled else llm
+        )
         raw = map_table(
-            alignment["source_table"], alignment["destination_collection"],
-            llm, embedder, top_k=args.top_k,
+            table_name, alignment["destination_collection"],
+            table_llm, embedder, top_k=args.top_k,
         )
         table = validate_table_mapping(raw, alignment["confidence"], alignment["reasoning"])
-        table = reask_low_confidence(table, llm, threshold=args.confidence_threshold)
+        table = reask_low_confidence(table, table_llm, threshold=args.confidence_threshold)
         tables.append(table)
 
         if args.verbose:
