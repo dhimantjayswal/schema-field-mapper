@@ -1,0 +1,118 @@
+# OpenTelemetry Collector configuration for Schema Field Mapper.
+#
+# This file is the whole point of decision P-001: the application speaks only
+# OTLP, and routing decisions live here. Swapping Splunk for Elastic, or Tempo
+# for Jaeger, is an edit to this file — never a change to application code.
+
+receivers:
+  otlp:
+    protocols:
+      grpc: {endpoint: 0.0.0.0:4317}
+      http: {endpoint: 0.0.0.0:4318}
+
+processors:
+  # Bound memory before the queue does it for you, badly.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+  resourcedetection:
+    detectors: [env, system, docker]
+
+  # Every signal carries the deployment identity.
+  resource:
+    attributes:
+      - {key: deployment.environment, value: "${ENV:-local}", action: upsert}
+      - {key: service.namespace, value: schema-field-mapper, action: upsert}
+
+  # Defence in depth: the application already refuses to log prompt bodies
+  # (P0-1 redaction filter), but a collector-side scrub means one careless
+  # log statement in a future PR cannot leak customer schema content into a
+  # broadly-readable index.
+  attributes/scrub:
+    actions:
+      - {key: prompt, action: delete}
+      - {key: response, action: delete}
+      - {key: api_key, action: delete}
+      - {key: authorization, action: delete}
+
+  # Per-field spans in stage 5 are ~34x the volume of everything else. Keep all
+  # errors, sample the rest. Tune the ratio once you have real volume numbers.
+  tail_sampling:
+    decision_wait: 10s
+    policies:
+      - name: keep-errors
+        type: status_code
+        status_code: {status_codes: [ERROR]}
+      - name: keep-slow
+        type: latency
+        latency: {threshold_ms: 5000}
+      - name: sample-rest
+        type: probabilistic
+        probabilistic: {sampling_percentage: 20}
+
+connectors:
+  # Derives metrics from log events at the collector, so error-rate alerting
+  # does not depend on Splunk being queryable. See Architecture section 3.2.
+  count:
+    logs:
+      sfm_log_events_total:
+        description: Log events by level and event type
+        attributes:
+          - key: level
+          - key: event
+          - key: stage
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    resource_to_telemetry_conversion: {enabled: true}
+
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls: {insecure: true}
+
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+  # --- Production sink. Enable in the prod overlay (backlog item P2-1). ---
+  # splunk_hec:
+  #   token: ${env:SPLUNK_HEC_TOKEN}
+  #   endpoint: https://splunk.internal:8088/services/collector
+  #   source: sfm
+  #   sourcetype: sfm:json
+  #   index: sfm_app
+  #   tls: {ca_file: /etc/ssl/certs/splunk-ca.pem}
+  #   retry_on_failure: {enabled: true, max_elapsed_time: 300s}
+  #   sending_queue: {enabled: true, storage: file_storage}
+
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, resource, attributes/scrub, tail_sampling, batch]
+      exporters: [otlp/tempo]
+
+    metrics:
+      receivers: [otlp, count]
+      processors: [memory_limiter, resourcedetection, resource, batch]
+      exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, resource, attributes/scrub, batch]
+      # Local: Loki only. Production adds splunk_hec here, with a routing
+      # processor sending WARN+ to Splunk and everything to Loki.
+      exporters: [otlphttp/loki, count]
+
+  telemetry:
+    logs: {level: info}
+    metrics: {level: detailed}

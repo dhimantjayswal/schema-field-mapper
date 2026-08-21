@@ -134,6 +134,22 @@ of the pipeline so the check isn't circular. Reports `accuracy@1`,
 `coverage`, `path_validity` (no hallucinated destination paths), sliced by
 difficulty. See `WRITEUP.md` for a real result and the bug it caught.
 
+## Production readiness (next phase)
+
+Everything above is a working prototype. `docs/production/PROD-PLATFORM-CONFLUENCE.md`
+is the architecture doc for running this as an enterprise service —
+structured logging → Splunk, Prometheus/Grafana metrics, Langfuse-style
+LLM observability (tokens, cost, prompt versioning), a FastAPI + Temporal
+service layer, and the security/CI/FinOps tooling around it.
+`docs/production/PROD-IMPLEMENTATION-BACKLOG.md` breaks that into 24
+ticket-ready items across 6 dependency-ordered phases (~52 engineer-days),
+each with acceptance criteria — start at Phase P0, `trace_id` propagation
+is the one thing everything else compounds off of.
+
+`deploy/observability/` has the local dev stack for Phase P0 (OTel
+Collector, Prometheus, Grafana, Loki, Tempo, Langfuse, LiteLLM) — not yet
+wired to the application code; that's P0-1 through P0-5 in the backlog.
+
 ## Pipeline stages
 
 | Stage | Module | LLM call? |
