@@ -48,3 +48,28 @@ def test_confidence_out_of_range_is_rejected():
     raw = _raw([{**_mapping("loc_id"), "confidence": 1.5}])
     with pytest.raises(ValidationError):
         validate_table_mapping(raw, table_confidence=0.9, table_reasoning="test")
+
+
+def test_conflicting_destination_claims_keep_the_higher_confidence_one():
+    """Regression test for a real bug found in a live run: the local model
+    mapped both `dob` and `created_ts` to `meta.createdAt` (confidences 0.7
+    and 0.8). Without conflict resolution, both ended up in the committed
+    output as if valid."""
+    raw = {
+        "source_table": "emp_master",
+        "destination_collection": "employees",
+        "field_mappings": [
+            {**_mapping("dob", "meta.createdAt"), "type_transform": "DATE", "confidence": 0.7,
+             "reasoning": "dob is often stored as the creation date"},
+            {**_mapping("created_ts", "meta.createdAt"), "type_transform": "DATETIME", "confidence": 0.8,
+             "reasoning": "created_ts closely aligns with meta.createdAt"},
+        ],
+        "unmapped_source_fields": [],
+    }
+
+    table = validate_table_mapping(raw, table_confidence=0.9, table_reasoning="test")
+
+    destinations = [fm.destination_field for fm in table.field_mappings]
+    assert destinations.count("meta.createdAt") == 1
+    assert "created_ts" in {fm.source_field for fm in table.field_mappings}
+    assert "dob" in table.unmapped_source_fields

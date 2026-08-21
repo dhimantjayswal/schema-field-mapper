@@ -36,6 +36,57 @@ class FieldMapping(BaseModel):
     notes: Optional[str] = None
 
 
+def _resolve_conflicts(field_mappings: list[FieldMapping]) -> tuple[list[FieldMapping], list[str]]:
+    """Deduplicate competing claims on the same `destination_field`.
+
+    A batched per-table LLM call has no visibility into what it already
+    assigned to other fields in the same response, so two source fields
+    can each independently — and each plausibly — claim the same
+    destination. A real run hit exactly this: `dob` and `created_ts` both
+    got mapped to `meta.createdAt` (confidences 0.7 and 0.8). Left
+    unresolved, both would sit in the delivered output as if valid.
+
+    Resolution is greedy highest-confidence-wins, not a full assignment
+    solve (e.g. Hungarian/`scipy.optimize.linear_sum_assignment`): at this
+    schema's scale (34 fields), a real conflict is rare and isolated, so
+    a global optimum over the whole conflict graph buys nothing a local
+    per-destination comparison doesn't already get for free. Revisit if a
+    much larger schema starts producing chained conflicts.
+
+    Args:
+        field_mappings: The (unvalidated-for-conflicts) mappings for one table.
+
+    Returns:
+        `(kept, demoted_source_fields)` — `kept` has at most one mapping
+        per `destination_field`; `demoted_source_fields` are the losers'
+        `source_field` names, meant to be folded into
+        `unmapped_source_fields` rather than silently dropped.
+
+    Example:
+        >>> mappings = [
+        ...     FieldMapping(source_field="dob", destination_field="meta.createdAt",
+        ...                  type_transform="DATE", confidence=0.7, reasoning="guess"),
+        ...     FieldMapping(source_field="created_ts", destination_field="meta.createdAt",
+        ...                  type_transform="DATETIME", confidence=0.8, reasoning="clear match"),
+        ... ]
+        >>> kept, demoted = _resolve_conflicts(mappings)
+        >>> [fm.source_field for fm in kept]
+        ['created_ts']
+        >>> demoted
+        ['dob']
+    """
+    best_by_target: dict[str, FieldMapping] = {}
+    for fm in field_mappings:
+        champion = best_by_target.get(fm.destination_field)
+        if champion is None or fm.confidence > champion.confidence:
+            best_by_target[fm.destination_field] = fm
+
+    kept = [fm for fm in field_mappings if best_by_target[fm.destination_field] is fm]
+    kept_source_fields = {fm.source_field for fm in kept}
+    demoted = [fm.source_field for fm in field_mappings if fm.source_field not in kept_source_fields]
+    return kept, demoted
+
+
 class TableMapping(BaseModel):
     """One entry of the final document's `tables[]` — matches the
     assignment's exact required shape for one source-table-to-destination-
@@ -55,12 +106,13 @@ class TableMapping(BaseModel):
 def validate_table_mapping(raw: dict, table_confidence: float, table_reasoning: str) -> TableMapping:
     """Stage 5: validate one table's LLM response and fill in completeness.
 
-    Two things happen here that the LLM call itself can't guarantee:
+    Three things happen here that the LLM call itself can't guarantee:
     schema validation (via Pydantic — malformed confidence, missing keys,
-    etc. raise immediately) and completeness (any source field the LLM's
-    response neither mapped nor declared unmapped is added to
-    `unmapped_source_fields` anyway, so nothing is silently dropped even
-    if the LLM's batched response missed one).
+    etc. raise immediately), conflict resolution (`_resolve_conflicts` —
+    two source fields can't both keep the same `destination_field`), and
+    completeness (any source field neither mapped nor declared unmapped —
+    including one just demoted by conflict resolution — is added to
+    `unmapped_source_fields`, so nothing is silently dropped).
 
     Args:
         raw: `pipeline.map_fields.map_table`'s return value — must have
@@ -100,9 +152,11 @@ def validate_table_mapping(raw: dict, table_confidence: float, table_reasoning: 
         unmapped_source_fields=raw.get("unmapped_source_fields", []),
     )
 
+    table.field_mappings, demoted = _resolve_conflicts(table.field_mappings)
+
     expected_source = {f.field for f in fields_for_table(table.source_table)}
     mapped_source = {fm.source_field for fm in table.field_mappings}
-    declared_unmapped = set(table.unmapped_source_fields)
+    declared_unmapped = set(table.unmapped_source_fields) | set(demoted)
     forgotten = expected_source - mapped_source - declared_unmapped
     # Anything the LLM forgot to declare either way still ends up unmapped,
     # never silently dropped.
