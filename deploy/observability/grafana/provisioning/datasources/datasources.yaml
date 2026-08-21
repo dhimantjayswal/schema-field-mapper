@@ -1,0 +1,39 @@
+# Provisions Prometheus/Loki/Tempo with trace<->log correlation wired
+# (Architecture doc §2.1 / §6) so a log line's trace_id links straight to
+# its Tempo trace, and vice versa — once the app actually emits trace_ids
+# (backlog item P0-2), this is what makes clicking through them free.
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    editable: true
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"trace_id":"(\w+)"'
+          name: TraceID
+          url: "$${__value.raw}"
+    editable: true
+
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: "-1h"
+        spanEndTimeShift: "1h"
+        filterByTraceID: true
+      serviceMap:
+        datasourceUid: prometheus
+    editable: true

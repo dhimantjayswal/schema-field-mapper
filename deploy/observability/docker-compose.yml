@@ -106,27 +106,90 @@ services:
     volumes: [langfuse-minio-data:/data]
     ports: ["9001:9001"]
 
+  # One-shot: creates the bucket LANGFUSE_S3_EVENT_UPLOAD_BUCKET below
+  # expects. MinIO doesn't auto-create buckets — without this, Langfuse's
+  # first trace upload throws "NoSuchBucket" and (given LANGFUSE_S3_EVENT_
+  # UPLOAD_REGION's fix above) crashes the process on the unhandled
+  # rejection. Found by actually sending a trace through the stack. The
+  # base minio/minio image has no healthcheck tooling to depend on, so
+  # this polls the alias itself rather than trusting a container-health
+  # signal that doesn't exist.
+  langfuse-minio-init:
+    image: minio/mc:latest
+    entrypoint: ["sh", "-c"]
+    command: >
+      "until mc alias set local http://langfuse-minio:9000 minio miniosecret; do sleep 1; done &&
+       mc mb local/langfuse --ignore-existing"
+    depends_on:
+      langfuse-minio: {condition: service_started}
+
   langfuse:
     image: langfuse/langfuse:3
     depends_on:
       langfuse-db: {condition: service_healthy}
+      langfuse-minio-init: {condition: service_completed_successfully}
     environment:
       DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
       CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      # Langfuse 3's migration runner needs the native-protocol URL
+      # separately from the HTTP one above — missing this fails startup
+      # with "CLICKHOUSE_MIGRATION_URL is not configured" (found by
+      # actually starting the stack, not in the original compose file).
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000/default
       CLICKHOUSE_USER: clickhouse
       CLICKHOUSE_PASSWORD: clickhouse
+      # Migrations default to `ON CLUSTER` DDL, which needs Zookeeper — this
+      # single ClickHouse node has none. Also found by actually starting
+      # the stack: "There is no Zookeeper configuration in server config".
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
       REDIS_CONNECTION_STRING: redis://:langfuse@langfuse-redis:6379
       LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
       LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
       LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
       LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
       LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      # The AWS SDK v3 client Langfuse uses refuses to sign any S3 request
+      # without a region, even against MinIO, which doesn't validate it —
+      # missing this throws an unhandled "Region is missing" rejection that
+      # kills the whole Node process on the first real trace upload. Found
+      # by actually sending a trace through the stack, not in the original
+      # compose file.
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
       # CHANGE BOTH before any shared deployment. Local dev values only.
       NEXTAUTH_SECRET: local-dev-only-change-me
       SALT: local-dev-only-change-me
       NEXTAUTH_URL: http://localhost:3001
       TELEMETRY_ENABLED: "false"
     ports: ["3001:3000"]
+
+  # The `langfuse` web container only accepts/queues events — a separate
+  # worker is what actually drains the ingestion queue into ClickHouse.
+  # Without this, `langfuse.flush()` succeeds, nothing errors, and traces
+  # still never appear ("Waiting for first trace" forever) — found by
+  # actually sending a trace through the stack and confirming it never
+  # showed up, not something the original compose file's absence of a
+  # worker service would have told you up front.
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    depends_on:
+      langfuse-db: {condition: service_healthy}
+      langfuse-minio-init: {condition: service_completed_successfully}
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000/default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_CLUSTER_ENABLED: "false"
+      REDIS_CONNECTION_STRING: redis://:langfuse@langfuse-redis:6379
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      SALT: local-dev-only-change-me
+      TELEMETRY_ENABLED: "false"
 
   # --- LLM gateway (backlog item P1-5) -----------------------------------
   litellm:

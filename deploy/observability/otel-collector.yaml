@@ -27,7 +27,13 @@ processors:
   # Every signal carries the deployment identity.
   resource:
     attributes:
-      - {key: deployment.environment, value: "${ENV:-local}", action: upsert}
+      # "${ENV:-local}" (bash-style default) isn't valid confmap syntax for
+      # this collector version — it's parsed as URI scheme "ENV", which
+      # doesn't exist, and the collector refuses to start. No ENV var is
+      # actually threaded into this container from docker-compose.yml
+      # anyway, so hardcode the dev value rather than fix the templating
+      # for an env var nothing sets yet.
+      - {key: deployment.environment, value: "local", action: upsert}
       - {key: service.namespace, value: schema-field-mapper, action: upsert}
 
   # Defence in depth: the application already refuses to log prompt bodies
