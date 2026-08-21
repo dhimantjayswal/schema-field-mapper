@@ -47,26 +47,56 @@ carries the same `trace_id`.
 cardinality reviewed — **no `field_key` as a metric label** (it belongs in logs
 and traces, not in Prometheus).
 
-### P0-4 · Local observability stack
-**Est:** 2d · **Deps:** P0-3
-- `deploy/observability/docker-compose.yml`: OTel Collector, Prometheus,
-  Grafana, Loki, Tempo, Langfuse (+ its Postgres/ClickHouse/Redis)
-- Collector config with the log/metric/trace pipelines and a `count_connector`
-- Provisioned Grafana datasources with trace↔log correlation configured
+### P0-4 · Local observability stack — **DONE, built ahead of P0-3**
+**Est:** 2d · **Deps:** ~~P0-3~~ (didn't turn out to be a real dependency — the
+stack stands up fine with no app metrics yet)
+- ✅ `deploy/observability/docker-compose.yml`: OTel Collector, Prometheus,
+  Grafana, Loki, Tempo, Langfuse (+ its Postgres/ClickHouse/Redis/MinIO),
+  `langfuse-worker`, LiteLLM — 13 containers, all verified healthy
+- ✅ Collector config, Grafana datasources (Prometheus/Loki/Tempo) with
+  trace↔log correlation *configured* — no real logs/traces flow through it
+  yet since that needs P0-1/P0-2, still open
+- ✅ `./scripts/start.sh` / `./scripts/stop.sh` — install, start, stop,
+  health-check-wait, print URLs; genuinely reproducible from a clean Docker
+  volume, not just working because of leftover state (verified by wiping
+  the Grafana volume and confirming everything re-provisions from files)
+- **Beyond original scope:** a working `LLM Operations` Grafana dashboard
+  (`grafana-clickhouse-datasource` plugin, queries Langfuse's ClickHouse
+  store directly) — real token/cost/latency data with zero app
+  instrumentation, since P0-1–P0-3 aren't done yet and empty panels help no one
+- **Bugs found by actually starting it** (none were visible from reading the
+  YAML): missing `prometheus.yml`/`tempo.yaml`/`litellm.config.yaml`/Grafana
+  provisioning; invalid `${ENV:-local}` collector syntax; missing
+  `CLICKHOUSE_MIGRATION_URL`; ClickHouse needing `CLICKHOUSE_CLUSTER_ENABLED=false`;
+  missing S3 region (crashed the process); MinIO bucket never created; and
+  the big one — **no `langfuse-worker` service at all**, so traces silently
+  never appeared (no error, just permanent "waiting for first trace")
 
-**AC:** `make obs-up && make run` → the run is visible in Grafana, Loki, Tempo,
-and Langfuse, and you can click from a log line to its trace.
+**AC (revised — original AC needs P0-1/P0-2 too):** `./scripts/start.sh` →
+Grafana, Langfuse, Prometheus, Loki, Tempo, MinIO all reachable and healthy.
+✅ Met. Trace↔log click-through: not yet — no real log/trace data exists to
+click between.
 
-### P0-5 · Langfuse integration
+### P0-5 · Langfuse integration — **DONE (core), partial on original scope**
 **Est:** 1d · **Deps:** P0-4
-- Wrap `LLMClient` with the Langfuse SDK: trace = run, span = stage,
-  generation = call
-- Tag every generation with `prompt_version`, `stage`, `field_key`, `tenant`
-- Emit `langfuse_trace_url` into the log line and as a span attribute
-- Migrate the four prompt files into the Langfuse prompt registry (git stays the
-  source of truth; Langfuse is the runtime override channel)
+- ✅ `LangfuseTracedLLMClient` wraps `ClaudeLLMClient`/`OllamaLLMClient`:
+  trace = per-table adjudication call, generation = the LLM call, real
+  prompt/response/model/token usage recorded
+- ✅ `ClaudeLLMClient`/`OllamaLLMClient` now capture real token usage
+  (`response.usage` / `prompt_eval_count`+`eval_count`) as `self.last_usage`
+- ✅ Auto-enabled by `run_pipeline.py` when `LANGFUSE_PUBLIC_KEY` is set — same
+  auto-detect pattern as backend selection, no flag needed
+- ❌ Not done: `prompt_version`/`stage`/`field_key`/`tenant` as separate
+  structured tags (generation `name` currently carries table context only,
+  e.g. `adjudicate:emp_master`); `langfuse_trace_url` isn't emitted into a
+  log line (no structured logging yet — P0-1); prompts haven't been
+  migrated into the Langfuse prompt registry, still plain Python functions
 
-**AC:** the §6 correlation walkthrough works end to end on a local run.
+**AC (original):** the §6 correlation walkthrough works end to end on a
+local run. **Not fully met** — that walkthrough spans Splunk/Tempo/logs too,
+which need P0-1/P0-2. What *is* verified end to end: a real pipeline run
+produces a real Langfuse trace with real token counts, visible in the UI
+and in the Grafana `LLM Operations` dashboard.
 
 ---
 
@@ -222,6 +252,10 @@ accuracy before and after — cost work that quietly costs accuracy is a regress
 | P4 | Platform hardening | 10d | k8s, GitOps, autoscaling, supply chain, DR |
 | P5 | Scale & optimisation | 8d | Vector scale, batch, cost control, multi-region |
 | | **Total** | **~52d** | ~11 weeks for one engineer; ~5 with two |
+
+**Progress:** P0-4 and P0-5 are done (see their entries above for exactly
+what that does and doesn't cover). P0-1, P0-2, P0-3, and everything in
+P1–P5 are still open.
 
 ### If you only do three things
 

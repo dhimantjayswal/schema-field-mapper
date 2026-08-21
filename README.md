@@ -14,6 +14,22 @@ first, then asks Claude to adjudicate one source table at a time against
 only its own candidates — never both full schemas in one call. Full
 reasoning in `WRITEUP.md`.
 
+## Quickstart
+
+```bash
+./scripts/start.sh   # venv + deps, MySQL/MongoDB, Grafana/Langfuse/Prometheus/Loki/Tempo/LiteLLM
+./scripts/stop.sh    # stop everything (observability data is kept; MySQL/Mongo re-seed fresh next time)
+```
+
+Idempotent — re-run `start.sh` any time, already-running services are left
+alone. It prints every URL when it's done. First run needs one manual step
+(Langfuse doesn't have an API for "create my first project"): open
+http://localhost:3001, sign up, create a project, and copy its keys into
+`.env` — `start.sh`'s own output has the exact steps.
+
+Everything below also works piece by piece if you'd rather not run the
+full stack — `./scripts/start.sh` is the fast path, not the only path.
+
 ## UI
 
 ```bash
@@ -70,6 +86,10 @@ systems" — `docker-compose.yml` makes that literal: real MySQL
 *same* schema data the pipeline reads (`scripts/generate_db_init.py`
 generates the seed scripts from `data/source_schema.py` /
 `data/dest_schema.py`, so they can't silently drift out of sync).
+
+`./scripts/start.sh` brings these up too — the commands below are for
+running just the databases, or building/running the pipeline's own
+container image, on their own:
 
 ```bash
 docker compose up -d mysql mongo   # start the two real databases
@@ -153,6 +173,9 @@ and token counts from actual pipeline runs. The rest (P0-1 through P0-3:
 structured logging, OTel spans, the metrics catalogue) is still open.
 
 ### Start it
+
+`./scripts/start.sh` (see Quickstart above) brings this up alongside the
+app databases. To start only the observability stack:
 
 ```bash
 cd deploy/observability
