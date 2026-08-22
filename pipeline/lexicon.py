@@ -38,7 +38,4 @@ def expand(tokens: list[str]) -> list[str]:
         >>> expand(["city"])
         ['city']
     """
-    out = []
-    for token in tokens:
-        out.extend(tokenize(LEXICON.get(token, token)))
-    return out
+    return [t for token in tokens for t in tokenize(LEXICON.get(token, token))]

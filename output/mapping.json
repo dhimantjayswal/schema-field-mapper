@@ -2,7 +2,7 @@
   "mapping_version": "1.0",
   "source": "legacy_hrm (MySQL)",
   "destination": "people_platform (MongoDB)",
-  "generated_at": "2026-08-21T15:29:53.403989+00:00",
+  "generated_at": "2026-08-21T21:20:54.575965+00:00",
   "tables": [
     {
       "source_table": "emp_master",
@@ -13,150 +13,150 @@
         {
           "source_field": "emp_id",
           "destination_field": "_id",
-          "type_transform": "ObjectId",
+          "type_transform": "INT -> ObjectId",
           "confidence": 1.0,
-          "reasoning": "emp_id is the primary key and is a good fit for the _id field in MongoDB.",
-          "notes": "No transformation needed."
+          "reasoning": "emp_id is the primary key and is a good identifier for the employee record.",
+          "notes": "No transformation needed, just cast to ObjectId."
         },
         {
           "source_field": "emp_cd",
           "destination_field": "employeeCode",
-          "type_transform": "String",
+          "type_transform": "VARCHAR(20) -> String",
           "confidence": 1.0,
-          "reasoning": "emp_cd is a freetext identifier and matches the employeeCode field in the candidate list.",
+          "reasoning": "emp_cd is a freetext code and the closest match is employeeCode.",
           "notes": "No transformation needed."
         },
         {
           "source_field": "f_name",
           "destination_field": "fullName.firstName",
-          "type_transform": "String",
+          "type_transform": "VARCHAR(50) -> String",
           "confidence": 1.0,
-          "reasoning": "f_name is a first name and matches the fullName.firstName field in the candidate list.",
+          "reasoning": "f_name is the first name and the closest match is fullName.firstName.",
           "notes": "No transformation needed."
         },
         {
           "source_field": "l_name",
           "destination_field": "fullName.lastName",
-          "type_transform": "String",
+          "type_transform": "VARCHAR(50) -> String",
           "confidence": 1.0,
-          "reasoning": "l_name is a last name and matches the fullName.lastName field in the candidate list.",
+          "reasoning": "l_name is the last name and the closest match is fullName.lastName.",
           "notes": "No transformation needed."
         },
         {
-          "source_field": "hire_dt",
+          "source_field": "dob",
           "destination_field": "employment.startDate",
-          "type_transform": "ISODate",
+          "type_transform": "DATE -> ISODate",
           "confidence": 1.0,
-          "reasoning": "hire_dt is the date of hire and matches the employment.startDate field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "dob is the date of birth and the closest match is employment.startDate.",
+          "notes": "Convert DATE to ISODate."
         },
         {
           "source_field": "term_dt",
           "destination_field": "employment.endDate",
-          "type_transform": "ISODate",
+          "type_transform": "DATETIME -> ISODate",
           "confidence": 1.0,
-          "reasoning": "term_dt is the date of termination and matches the employment.endDate field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "term_dt is the termination date and the closest match is employment.endDate.",
+          "notes": "Convert DATETIME to ISODate."
         },
         {
           "source_field": "dept_id",
           "destination_field": "department.departmentId",
-          "type_transform": "ObjectId",
+          "type_transform": "INT -> ObjectId",
           "confidence": 1.0,
-          "reasoning": "dept_id is a foreign key to the department and matches the department.departmentId field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "dept_id is a foreign key to the department and the closest match is department.departmentId.",
+          "notes": "Cast INT to ObjectId."
         },
         {
           "source_field": "mgr_emp_id",
           "destination_field": "employment.managerId",
-          "type_transform": "ObjectId",
+          "type_transform": "INT -> ObjectId",
           "confidence": 1.0,
-          "reasoning": "mgr_emp_id is a foreign key to the manager and matches the employment.managerId field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "mgr_emp_id is a foreign key to the manager and the closest match is employment.managerId.",
+          "notes": "Cast INT to ObjectId."
         },
         {
           "source_field": "job_lvl_cd",
           "destination_field": "employment.jobLevel",
-          "type_transform": "String",
+          "type_transform": "VARCHAR(10) -> String",
           "confidence": 1.0,
-          "reasoning": "job_lvl_cd is a job level code and matches the employment.jobLevel field in the candidate list.",
+          "reasoning": "job_lvl_cd is the job level code and the closest match is employment.jobLevel.",
           "notes": "No transformation needed."
         },
         {
           "source_field": "base_sal",
           "destination_field": "compensation.baseSalary",
-          "type_transform": "Number",
+          "type_transform": "DECIMAL(12,2) -> Number",
           "confidence": 1.0,
-          "reasoning": "base_sal is a base salary and matches the compensation.baseSalary field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "base_sal is the base salary and the closest match is compensation.baseSalary.",
+          "notes": "Convert DECIMAL to Number."
         },
         {
           "source_field": "sal_currency",
           "destination_field": "compensation.currency",
-          "type_transform": "String",
+          "type_transform": "CHAR(3) -> String",
           "confidence": 1.0,
-          "reasoning": "sal_currency is a currency code and matches the compensation.currency field in the candidate list.",
+          "reasoning": "sal_currency is the currency code and the closest match is compensation.currency.",
           "notes": "No transformation needed."
         },
         {
           "source_field": "work_email",
           "destination_field": "contact.email",
-          "type_transform": "String",
+          "type_transform": "VARCHAR(120) -> String",
           "confidence": 1.0,
-          "reasoning": "work_email is an email address and matches the contact.email field in the candidate list.",
+          "reasoning": "work_email is the work email and the closest match is contact.email.",
           "notes": "No transformation needed."
         },
         {
           "source_field": "work_phone",
           "destination_field": "contact.phone",
-          "type_transform": "String",
+          "type_transform": "VARCHAR(20) -> String",
           "confidence": 1.0,
-          "reasoning": "work_phone is a phone number and matches the contact.phone field in the candidate list.",
+          "reasoning": "work_phone is the work phone and the closest match is contact.phone.",
           "notes": "No transformation needed."
         },
         {
           "source_field": "office_loc_id",
           "destination_field": "location.locationId",
-          "type_transform": "ObjectId",
+          "type_transform": "INT -> ObjectId",
           "confidence": 1.0,
-          "reasoning": "office_loc_id is a foreign key to the location and matches the location.locationId field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "office_loc_id is a foreign key to the location and the closest match is location.locationId.",
+          "notes": "Cast INT to ObjectId."
         },
         {
           "source_field": "is_remote",
           "destination_field": "employment.isRemote",
-          "type_transform": "Boolean",
+          "type_transform": "TINYINT(1) -> Boolean",
           "confidence": 1.0,
-          "reasoning": "is_remote is a boolean flag and matches the employment.isRemote field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "is_remote is a boolean flag and the closest match is employment.isRemote.",
+          "notes": "Convert TINYINT to Boolean."
         },
         {
           "source_field": "rec_stat",
           "destination_field": "employment.status",
-          "type_transform": "String",
+          "type_transform": "CHAR(1) -> String",
           "confidence": 1.0,
-          "reasoning": "rec_stat is a record status and matches the employment.status field in the candidate list.",
+          "reasoning": "rec_stat is the record status and the closest match is employment.status.",
           "notes": "No transformation needed."
         },
         {
           "source_field": "created_ts",
           "destination_field": "meta.createdAt",
-          "type_transform": "ISODate",
+          "type_transform": "DATETIME -> ISODate",
           "confidence": 1.0,
-          "reasoning": "created_ts is the record creation timestamp and matches the meta.createdAt field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "created_ts is the creation timestamp and the closest match is meta.createdAt.",
+          "notes": "Convert DATETIME to ISODate."
         },
         {
           "source_field": "updated_ts",
           "destination_field": "meta.updatedAt",
-          "type_transform": "ISODate",
+          "type_transform": "DATETIME -> ISODate",
           "confidence": 1.0,
-          "reasoning": "updated_ts is the last update timestamp and matches the meta.updatedAt field in the candidate list.",
-          "notes": "No transformation needed."
+          "reasoning": "updated_ts is the last update timestamp and the closest match is meta.updatedAt.",
+          "notes": "Convert DATETIME to ISODate."
         }
       ],
       "unmapped_source_fields": [
-        "dob"
+        "hire_dt"
       ],
       "unmapped_destination_fields": [
         "department.code",
@@ -180,55 +180,59 @@
           "type_transform": "INT -> ObjectId",
           "confidence": 1.0,
           "reasoning": "dept_id is the primary key and serves as an identifier, which matches the role of _id in MongoDB.",
-          "notes": null
+          "notes": "No transformation needed."
         },
         {
           "source_field": "dept_cd",
           "destination_field": "code",
           "type_transform": "VARCHAR(20) -> String",
           "confidence": 1.0,
-          "reasoning": "dept_cd is a freetext code, which aligns with the role of code in the candidate fields.",
-          "notes": null
+          "reasoning": "dept_cd is a freetext code, which matches the role of code in the candidate list.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "dept_nm",
           "destination_field": "name",
           "type_transform": "VARCHAR(100) -> String",
           "confidence": 1.0,
-          "reasoning": "dept_nm is a freetext name, which matches the role of name in the candidate fields.",
-          "notes": null
+          "reasoning": "dept_nm is a freetext name, which matches the role of name in the candidate list.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "parent_dept_id",
           "destination_field": "parentDepartmentId",
           "type_transform": "INT -> ObjectId",
           "confidence": 1.0,
-          "reasoning": "parent_dept_id is a foreign key to dept_id, which matches the role of parentDepartmentId in the candidate fields.",
-          "notes": null
+          "reasoning": "parent_dept_id is a foreign key to dept_id, which matches the role of parentDepartmentId in the candidate list.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "dept_head_id",
           "destination_field": "headEmployeeId",
           "type_transform": "INT -> ObjectId",
           "confidence": 1.0,
-          "reasoning": "dept_head_id is a foreign key to emp_master.emp_id, which matches the role of headEmployeeId in the candidate fields.",
-          "notes": null
+          "reasoning": "dept_head_id is a foreign key to emp_master.emp_id, which matches the role of headEmployeeId in the candidate list.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "cost_ctr_cd",
           "destination_field": "costCenterCode",
           "type_transform": "VARCHAR(20) -> String",
           "confidence": 1.0,
-          "reasoning": "cost_ctr_cd is a freetext finance cost center code, which matches the role of costCenterCode in the candidate fields.",
-          "notes": null
+          "reasoning": "cost_ctr_cd is a freetext code representing a finance cost center, which matches the role of costCenterCode in the candidate list.",
+          "notes": "No transformation needed."
+        },
+        {
+          "source_field": "dept_stat",
+          "destination_field": "isActive",
+          "type_transform": "CHAR(1) -> Boolean",
+          "confidence": 1.0,
+          "reasoning": "dept_stat is an enum code representing active or inactive status, which matches the role of isActive in the candidate list.",
+          "notes": "Convert 'A' to true and 'I' to false."
         }
       ],
-      "unmapped_source_fields": [
-        "dept_stat"
-      ],
-      "unmapped_destination_fields": [
-        "isActive"
-      ]
+      "unmapped_source_fields": [],
+      "unmapped_destination_fields": []
     },
     {
       "source_table": "locations",
@@ -241,64 +245,64 @@
           "destination_field": "_id",
           "type_transform": "ObjectId",
           "confidence": 1.0,
-          "reasoning": "loc_id is the primary key and serves as an identifier, which matches the role of _id in MongoDB.",
-          "notes": null
+          "reasoning": "loc_id is the primary key and serves as an identifier, matching the role of _id in MongoDB.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "loc_cd",
           "destination_field": "code",
           "type_transform": "String",
-          "confidence": 0.8,
-          "reasoning": "loc_cd is a freetext field and the 'code' field in the candidates list is the closest match in terms of role and content.",
-          "notes": null
+          "confidence": 0.85,
+          "reasoning": "loc_cd is a freetext field and is the most likely candidate for the 'code' field, which also has a freetext role. However, the confidence has been slightly reduced to 0.85 as there could be additional factors or data that might affect the accuracy of this mapping.",
+          "notes": "Consider additional validation or mapping rules to ensure the accuracy of this transformation."
         },
         {
           "source_field": "loc_nm",
           "destination_field": "name",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "loc_nm is a freetext field and the 'name' field in the candidates list is the closest match in terms of role and content.",
-          "notes": null
+          "reasoning": "loc_nm is a freetext field and the most suitable candidate for the 'name' field, which also has a freetext role.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "city",
           "destination_field": "city",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "city is a freetext field and the 'city' field in the candidates list is the closest match in terms of role and content.",
-          "notes": null
+          "reasoning": "city is a freetext field and the most appropriate candidate for the 'city' field, which also has a freetext role.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "state_prov",
           "destination_field": "stateOrProvince",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "state_prov is a freetext field and the 'stateOrProvince' field in the candidates list is the closest match in terms of role and content.",
-          "notes": null
+          "reasoning": "state_prov is a freetext field and the best match for the 'stateOrProvince' field, which also has a freetext role.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "country_cd",
           "destination_field": "country",
           "type_transform": "String",
-          "confidence": 0.8,
-          "reasoning": "country_cd is a freetext field and the 'country' field in the candidates list is the closest match in terms of role and content.",
-          "notes": null
+          "confidence": 1.0,
+          "reasoning": "country_cd is a freetext field and the most suitable candidate for the 'country' field, which also has a freetext role.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "postal_cd",
           "destination_field": "postalCode",
           "type_transform": "String",
           "confidence": 1.0,
-          "reasoning": "postal_cd is a freetext field and the 'postalCode' field in the candidates list is the closest match in terms of role and content.",
-          "notes": null
+          "reasoning": "postal_cd is a freetext field and the best match for the 'postalCode' field, which also has a freetext role.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "tz_cd",
           "destination_field": "timezone",
           "type_transform": "String",
-          "confidence": 0.8,
-          "reasoning": "tz_cd is a freetext field and the 'timezone' field in the candidates list is the closest match in terms of role and content.",
-          "notes": null
+          "confidence": 1.0,
+          "reasoning": "tz_cd is a freetext field and the most appropriate candidate for the 'timezone' field, which also has a freetext role.",
+          "notes": "No transformation needed."
         }
       ],
       "unmapped_source_fields": [],

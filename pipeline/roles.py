@@ -15,12 +15,6 @@ _AUDIT_HINTS = {"created", "updated", "modified"}
 _MONEY_HINTS = {"sal", "salary", "amt", "amount", "price", "cost"}
 _CONTACT_HINTS = {"email", "phone", "contact"}
 
-ROLES = (
-    "identifier", "foreign_key", "timestamp_audit", "timestamp_business",
-    "enum_code", "boolean_flag", "money", "contact", "freetext",
-)
-
-
 def classify_role(
     name: str,
     type_str: str,
@@ -40,7 +34,8 @@ def classify_role(
         fk: FK/ref target (`"table.column"`), if this is a foreign key.
 
     Returns:
-        One of `ROLES`.
+        One of "identifier", "foreign_key", "timestamp_audit", "timestamp_business",
+        "enum_code", "boolean_flag", "money", "contact", "freetext".
 
     Example:
         >>> classify_role("hire_dt", "DATETIME")
