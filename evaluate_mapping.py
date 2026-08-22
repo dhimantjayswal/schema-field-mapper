@@ -18,6 +18,11 @@ DEFAULT_MAPPING_PATH = Path(__file__).parent / "output" / "mapping.json"
 
 
 def main() -> int:
+    """CLI entrypoint: load `--mapping` (default `output/mapping.json`),
+    score it against `GOLD_MAPPING` via `pipeline.evaluate.score_mapping`,
+    print the breakdown, and exit `1` instead of `0` if `--fail-under` is
+    given and `accuracy_at_1` falls short — lets CI gate on mapping quality.
+    """
     parser = argparse.ArgumentParser(description="Score a mapping.json against the gold mapping.")
     parser.add_argument("--mapping", type=Path, default=DEFAULT_MAPPING_PATH)
     parser.add_argument("--fail-under", type=float, default=None,

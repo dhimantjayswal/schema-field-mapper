@@ -13,6 +13,7 @@ Run:
     streamlit run app.py
 """
 import json
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -24,7 +25,7 @@ from pipeline.align_tables import align_tables
 from pipeline.assemble import assemble
 from pipeline.embed_candidates import SentenceTransformerEmbedder
 from pipeline.evaluate import score_mapping
-from pipeline.llm_client import ClaudeLLMClient, OllamaLLMClient
+from pipeline.llm_client import ClaudeLLMClient, LangfuseTracedLLMClient, OllamaLLMClient
 from pipeline.map_fields import map_table
 from pipeline.reask import reask_low_confidence
 from pipeline.validate import validate_table_mapping
@@ -57,19 +58,28 @@ if run_clicked:
     progress_bar = st.progress(0.0)
     live = st.container()
 
+    # Auto-traces to Langfuse (deploy/observability) when its keys are set,
+    # same auto-detect-from-environment pattern as run_pipeline.py.
+    langfuse_enabled = bool(os.environ.get("LANGFUSE_PUBLIC_KEY"))
+    model_name = "claude-sonnet-4-5" if backend == "claude" else ollama_model
+
     tables = []
     for i, alignment in enumerate(alignments):
         status = live.status(
             f"Mapping **{alignment['source_table']}** → **{alignment['destination_collection']}**...",
             expanded=True,
         )
+        table_llm = (
+            LangfuseTracedLLMClient(llm, name=f"adjudicate:{alignment['source_table']}", model=model_name)
+            if langfuse_enabled else llm
+        )
         try:
             raw = map_table(
                 alignment["source_table"], alignment["destination_collection"],
-                llm, embedder, top_k=top_k,
+                table_llm, embedder, top_k=top_k,
             )
             table = validate_table_mapping(raw, alignment["confidence"], alignment["reasoning"])
-            table = reask_low_confidence(table, llm, threshold=threshold)
+            table = reask_low_confidence(table, table_llm, threshold=threshold)
         except Exception as exc:
             status.update(label=f"Failed on {alignment['source_table']}: {exc}", state="error")
             st.stop()

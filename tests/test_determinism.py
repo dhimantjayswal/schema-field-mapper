@@ -19,6 +19,8 @@ from tests.fakes import FakeEmbedder, FakeLLMClient
 
 
 def _run():
+    """One full cold pipeline run (Stages 1, 3-7) with fixed `generated_at`,
+    so two calls are comparable for exact equality."""
     embedder, llm = FakeEmbedder(), FakeLLMClient()
     tables = []
     for alignment in align_tables():
@@ -29,4 +31,5 @@ def _run():
 
 
 def test_two_runs_produce_identical_output():
+    """Two cold runs over the same fake responses produce byte-identical output."""
     assert _run() == _run()

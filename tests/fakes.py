@@ -24,6 +24,9 @@ class FakeEmbedder:
     """
 
     def encode(self, texts: list[str]) -> np.ndarray:
+        """See `pipeline.embed_candidates.Embedder.encode`. Builds a
+        one-hot-per-token bag-of-words vector per text over the vocabulary
+        seen across `texts` — no external model, fully deterministic."""
         vocab: dict[str, int] = {}
         tokenized = [tokenize(text) for text in texts]
         for words in tokenized:
@@ -61,6 +64,11 @@ class FakeLLMClient:
     """
 
     def map_fields(self, prompt: str) -> dict:
+        """See `pipeline.llm_client.LLMClient.map_fields`. Regex-free
+        line parse of the `- field -> candidates: [...]` lines
+        `build_field_mapping_prompt` emits; a field with no candidates
+        goes to `unmapped_source_fields`, otherwise its first (highest-
+        ranked) candidate is taken as the mapping."""
         field_mappings = []
         unmapped = []
         for line in prompt.splitlines():

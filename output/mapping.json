@@ -2,7 +2,7 @@
   "mapping_version": "1.0",
   "source": "legacy_hrm (MySQL)",
   "destination": "people_platform (MongoDB)",
-  "generated_at": "2026-08-21T21:20:54.575965+00:00",
+  "generated_at": "2026-08-22T02:16:57.884764+00:00",
   "tables": [
     {
       "source_table": "emp_master",
@@ -252,9 +252,9 @@
           "source_field": "loc_cd",
           "destination_field": "code",
           "type_transform": "String",
-          "confidence": 0.85,
-          "reasoning": "loc_cd is a freetext field and is the most likely candidate for the 'code' field, which also has a freetext role. However, the confidence has been slightly reduced to 0.85 as there could be additional factors or data that might affect the accuracy of this mapping.",
-          "notes": "Consider additional validation or mapping rules to ensure the accuracy of this transformation."
+          "confidence": 0.9,
+          "reasoning": "loc_cd is a freetext field and the most likely candidate for the 'code' field, which also has a freetext role.",
+          "notes": "No transformation needed."
         },
         {
           "source_field": "loc_nm",

@@ -32,6 +32,7 @@ _BSON_TYPE = {
 
 
 def _sql_escape(text: str) -> str:
+    """Escape a single-quoted MySQL string literal (doubles embedded `'`)."""
     return text.replace("'", "''")
 
 
@@ -91,10 +92,15 @@ class _Leaf:
     `employment.status` (a leaf) without relying on key-shape sniffing."""
 
     def __init__(self, bson_type: str):
+        """`bson_type`: the `$jsonSchema` `bsonType` string for this leaf field."""
         self.bson_type = bson_type
 
 
 def _nest(fields: list) -> dict:
+    """Turn `DEST_SCHEMA["collections"][c]`'s flat dot-path field list into
+    a nested dict tree — e.g. `employment.status` and `employment.startDate`
+    both land under one `tree["employment"]` group — with each leaf marked
+    by `_Leaf` so `_tree_to_properties` can tell a field from a group."""
     tree: dict = {}
     for field in fields:
         parts = field["path"].split(".")
@@ -148,6 +154,9 @@ def generate_mongo_init() -> str:
 
 
 def main() -> None:
+    """CLI entrypoint: render both seed scripts and write them to
+    `docker/mysql-init/01-legacy_hrm.sql` / `docker/mongo-init/01-people_platform.js`,
+    creating those directories if needed."""
     MYSQL_INIT_DIR.mkdir(parents=True, exist_ok=True)
     MONGO_INIT_DIR.mkdir(parents=True, exist_ok=True)
 

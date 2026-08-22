@@ -11,6 +11,10 @@ from scripts.generate_db_init import _nest, _tree_to_properties, generate_mysql_
 
 
 def _leaf_paths(node, prefix=""):
+    """Flatten a `$jsonSchema` `properties` tree (as built by
+    `_tree_to_properties`) back into dot-paths, e.g.
+    `{"employment": {"properties": {"status": ...}}}` -> `["employment.status"]`
+    — the inverse of `_nest`, used to check nothing was lost or double-wrapped."""
     out = []
     for key, value in node.get("properties", {}).items():
         path = f"{prefix}{key}"
@@ -22,6 +26,8 @@ def _leaf_paths(node, prefix=""):
 
 
 def test_reconstructed_paths_match_dest_schema_exactly():
+    """Round-tripping every collection's fields through `_nest` + `_tree_to_properties`
+    and flattening back with `_leaf_paths` reproduces the exact original path set."""
     for collection, fields in DEST_SCHEMA["collections"].items():
         schema = {"bsonType": "object", "properties": _tree_to_properties(_nest(fields))}
         json.dumps(schema)  # must be valid JSON, not just a Python dict
@@ -42,6 +48,8 @@ def test_nested_group_is_wrapped_exactly_once():
 
 
 def test_mysql_ddl_creates_every_table_and_declares_every_fk():
+    """The rendered DDL has one `CREATE TABLE` per source table and one
+    `ADD FOREIGN KEY` per FK column in the schema."""
     ddl = generate_mysql_ddl()
     for table in SOURCE_SCHEMA["tables"]:
         assert f"CREATE TABLE {table} (" in ddl

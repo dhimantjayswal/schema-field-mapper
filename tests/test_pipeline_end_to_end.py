@@ -12,6 +12,8 @@ from tests.fakes import FakeEmbedder, FakeLLMClient
 
 
 def _run_cold_pipeline():
+    """Stages 1, 3-7 wired together with fakes; returns the per-table
+    `TableMapping` list `pipeline.assemble.assemble` would receive next."""
     embedder = FakeEmbedder()
     llm = FakeLLMClient()
 
@@ -27,11 +29,13 @@ def _run_cold_pipeline():
 
 
 def test_pipeline_runs_cold_end_to_end():
+    """A cold run (Stages 1, 3-7 with fakes) produces one `TableMapping` per source table."""
     tables = _run_cold_pipeline()
     assert {t.source_table for t in tables} == {"emp_master", "dept_info", "locations"}
 
 
 def test_every_source_field_accounted_for():
+    """Every source field ends up either mapped or in `unmapped_source_fields` — never dropped."""
     tables = _run_cold_pipeline()
     for table in tables:
         expected = {f.field for f in fields_for_table(table.source_table)}
@@ -41,6 +45,7 @@ def test_every_source_field_accounted_for():
 
 
 def test_assembled_document_matches_expected_shape():
+    """`assemble`'s output has the assignment's required top-level and per-table keys."""
     tables = _run_cold_pipeline()
     document = assemble(tables, generated_at="2026-08-21T00:00:00+00:00")
 

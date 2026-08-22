@@ -47,12 +47,14 @@ EXPECTED_ROLES = {
 
 
 def test_expected_roles_cover_every_source_field():
+    """`EXPECTED_ROLES` has exactly one entry per real source field — no gaps, no stale extras."""
     all_fields = {(f.table, f.field) for f in load_source_fields()}
     assert set(EXPECTED_ROLES) == all_fields
 
 
 @pytest.mark.parametrize("table,field", list(EXPECTED_ROLES))
 def test_role_matches_expected(table, field):
+    """`classify_role` (via `SourceField.role`) matches the expected role for this exact field."""
     f = next(f for f in load_source_fields() if f.table == table and f.field == field)
     assert f.role == EXPECTED_ROLES[(table, field)]
 

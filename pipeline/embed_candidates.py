@@ -73,6 +73,8 @@ class Embedder(Protocol):
     """
 
     def encode(self, texts: list[str]) -> np.ndarray:
+        """Embed `texts` into a `(len(texts), dim)` float array, one row
+        per input string, in the same order."""
         ...
 
 
@@ -94,9 +96,12 @@ class SentenceTransformerEmbedder:
     _MODEL_NAME = "all-MiniLM-L6-v2"
 
     def __init__(self) -> None:
+        """No I/O here — the model downloads/loads lazily on first `.encode()`."""
         self._model = None
 
     def encode(self, texts: list[str]) -> np.ndarray:
+        """See `Embedder.encode`. Downloads/loads `_MODEL_NAME` on the
+        first call, then reuses the cached instance for every call after."""
         if self._model is None:
             from sentence_transformers import SentenceTransformer
             self._model = SentenceTransformer(self._MODEL_NAME)

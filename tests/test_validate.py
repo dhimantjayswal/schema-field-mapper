@@ -1,3 +1,14 @@
+"""Stage 5 (validation + completeness) regression tests.
+
+Covers the three things `validate_table_mapping` guarantees that a raw LLM
+response can't: a forgotten field ends up in `unmapped_source_fields`
+rather than silently dropped, `unmapped_destination_fields` is computed
+from the real schema (not trusted to the LLM), an out-of-range confidence
+raises via Pydantic, and — the regression case for a real bug hit in a
+live run — two source fields competing for the same destination_field
+resolve to exactly one winner. See `pipeline.validate._resolve_conflicts`
+for the resolution rule.
+"""
 import pytest
 from pydantic import ValidationError
 
@@ -5,6 +16,9 @@ from pipeline.validate import validate_table_mapping
 
 
 def _raw(field_mappings, unmapped=None):
+    """Build a raw dict shaped like `pipeline.map_fields.map_table`'s
+    return value, scoped to the "locations" table, ready for
+    `validate_table_mapping`."""
     return {
         "source_table": "locations",
         "destination_collection": "locations",
@@ -14,6 +28,8 @@ def _raw(field_mappings, unmapped=None):
 
 
 def _mapping(source_field, destination_field="code"):
+    """Build one raw field-mapping dict with placeholder
+    type_transform/reasoning/confidence — override via `**` where a test needs to."""
     return {
         "source_field": source_field,
         "destination_field": destination_field,
@@ -25,6 +41,8 @@ def _mapping(source_field, destination_field="code"):
 
 
 def test_forgotten_field_ends_up_unmapped_not_silently_dropped():
+    """A source field the (simulated) LLM neither mapped nor declared unmapped is
+    still added to `unmapped_source_fields` — completeness is enforced, not trusted."""
     # locations has 8 source fields; this batch only maps loc_id, leaving 7
     # neither mapped nor declared unmapped by the (simulated) LLM response.
     raw = _raw([{**_mapping("loc_id"), "destination_field": "_id", "type_transform": "INT -> ObjectId"}])
@@ -36,6 +54,7 @@ def test_forgotten_field_ends_up_unmapped_not_silently_dropped():
 
 
 def test_unmapped_destination_fields_computed_by_set_difference():
+    """`unmapped_destination_fields` is the real schema's fields minus whatever got mapped."""
     raw = _raw([{**_mapping("loc_id"), "destination_field": "_id", "type_transform": "INT -> ObjectId"}])
 
     table = validate_table_mapping(raw, table_confidence=0.9, table_reasoning="test")
@@ -45,6 +64,7 @@ def test_unmapped_destination_fields_computed_by_set_difference():
 
 
 def test_confidence_out_of_range_is_rejected():
+    """A confidence outside `[0, 1]` raises `ValidationError` via Pydantic's `Field(ge=0, le=1)`."""
     raw = _raw([{**_mapping("loc_id"), "confidence": 1.5}])
     with pytest.raises(ValidationError):
         validate_table_mapping(raw, table_confidence=0.9, table_reasoning="test")
