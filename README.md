@@ -43,6 +43,29 @@ last `output/mapping.json`: per-table results with confidence bars,
 unmapped-field warnings, and the gold-mapping eval scorecard, all in one
 page instead of raw JSON + a separate `evaluate_mapping.py` call.
 
+![Streamlit — mapping results](docs/screenshots/streamlit-overview.jpg)
+
+*Sidebar (left):* `▶ Run pipeline` triggers a live run against the
+selected backend/knobs. *Results (right, per table):* every
+`source_field → destination_field` pair from `pipeline/validate.py`'s
+`TableMapping`, with `type_transform`, a `confidence` bar (0-1, from
+Stage 4's LLM call, revised by Stage 7 if it fell below the re-ask
+threshold), and `reasoning` — the LLM's one-sentence justification for
+that specific mapping.
+
+![Streamlit — evaluation scorecard](docs/screenshots/streamlit-evaluation.jpg)
+
+*Evaluation vs. gold mapping* (`pipeline/evaluate.py`, scrolled further
+down the same page):
+
+| Metric | Meaning |
+| :-- | :-- |
+| **Accuracy@1** | Fraction of the 34 gold-labeled fields whose top prediction matches the gold `expected` (or an accepted `alternatives` entry). The single headline correctness number. |
+| **Coverage** | Fraction of gold fields the pipeline produced *any* verdict for (mapped or explicitly `unmapped`) — expected to be 100% by construction, since `validate_table_mapping`'s completeness check makes it a structural guarantee, not an empirical one. |
+| **Path validity** | Fraction of emitted `destination_field` values that are real paths in `data/dest_schema.py` — catches a hallucinated destination before it reaches a real migration. |
+| **by difficulty table** | Accuracy sliced by the `easy`/`medium`/`hard` label `data/gold_mapping.py` assigns each field — hard cases (like the `dob` no-match trap) are expected to score lower than easy ones. |
+| **Misses** | Every field where the prediction didn't match gold: `field`, `expected`, `predicted` — the fastest way to see exactly what went wrong and why. |
+
 ## Setup
 
 ```bash
@@ -203,15 +226,75 @@ prompt, full response, real token counts, latency — as it happens.
 
 ### Dashboards
 
-- **Langfuse → Dashboards** — ships 4 dashboards out of the box (Home,
-  Cost, Latency, Usage Management), all pre-wired to real trace data. No
-  setup needed.
-- **Grafana → Dashboards → Schema Field Mapper → LLM Operations** — calls,
-  total tokens, cost, token usage over time, calls by table, recent
-  generations. Reads Langfuse's own ClickHouse store directly
-  (`grafana-clickhouse-datasource`) — real data from every traced call,
-  no app instrumentation needed. `$0.00` cost is correct, not broken: no
-  pricing model is registered for `qwen2.5:7b` since Ollama is free/local.
+Screenshots below are from a real local run (Ollama backend, `qwen2.5:7b`) —
+not mockups.
+
+#### Langfuse (http://localhost:3001)
+
+![Langfuse — project home](docs/screenshots/langfuse-home.jpg)
+
+**Home** is the first thing you see per project:
+
+| Panel | Meaning |
+| :-- | :-- |
+| **Traces** | One trace per LLM call this pipeline made (`LangfuseTracedLLMClient.map_fields` creates one generation per call — Stage 4's per-table adjudication, plus any Stage 7 re-asks). The bar chart breaks it down by trace name (`adjudicate:<table>`), so you can see call volume per source table at a glance. |
+| **Model costs** | Summed `total_cost` across all generations, by model. `$0.00` for `qwen2.5:7b` is correct, not broken — Langfuse has no registered USD pricing for local Ollama models, only hosted APIs like Claude. |
+| **Scores** | Human/automated quality scores attached to traces via Langfuse's `Evaluators`/`Human Annotation` — "No data" here because this pipeline doesn't push scores back to Langfuse; `pipeline/evaluate.py`'s accuracy/coverage/path_validity numbers (shown in the Streamlit evaluation scorecard above) are the equivalent signal, computed independently. |
+| **Traces by time** | Call volume over the selected window (`Past 1 day` here) — a quick way to spot when a run happened and how long it took. |
+| **Model Usage** | Token/cost breakdown by model, switchable between cost/usage and by-model/by-type views. |
+
+![Langfuse — traces list](docs/screenshots/langfuse-traces-list.jpg)
+
+**Tracing → Traces** is the full, filterable log: every call's timestamp,
+name, raw `Input` (the exact prompt `pipeline/prompts.py` built) and
+`Output` (the raw LLM response) side by side — useful for spotting a bad
+prompt or a malformed response without re-running anything.
+
+![Langfuse — trace detail](docs/screenshots/langfuse-trace-detail.jpg)
+
+Clicking a trace opens the detail panel: **Latency** (wall-clock time for
+that one call), **prompt → completion token counts** (`1,154 prompt → 655
+completion` here, read from `ClaudeLLMClient`/`OllamaLLMClient`'s
+`last_usage`), and the full formatted **Input**/Output — this is
+`build_field_mapping_prompt`'s exact text, letters-for-letters what the
+model saw, which is what makes a bad mapping debuggable instead of a
+black box.
+
+#### Grafana (http://localhost:3000 → Dashboards → Schema Field Mapper → LLM Operations)
+
+![Grafana — LLM Operations, top row](docs/screenshots/grafana-llm-operations-top.jpg)
+
+This dashboard (`deploy/observability/grafana/dashboards/llm-operations.json`)
+reads Langfuse's own ClickHouse store **directly**
+(`grafana-clickhouse-datasource`, querying the `observations` table where
+`type = 'GENERATION'`) — no separate app instrumentation, every traced
+call shows up here automatically:
+
+| Panel | Query (simplified) | Meaning |
+| :-- | :-- | :-- |
+| **Total LLM Calls** | `count()` generations | Every Stage 4/7 LLM call ever traced, all time. |
+| **Total Tokens (input + output)** | `sum(input) + sum(output)` | Combined prompt + completion tokens across every call — the raw volume driving cost. |
+| **Total Cost (USD)** | `sum(total_cost)` | Same `$0.00`-is-correct caveat as Langfuse Home above — no pricing model for local Ollama. |
+| **Token Usage Over Time** | tokens grouped by minute | Two series (input vs. output) plotted over time — spikes line up with actual pipeline runs; a wide gap between input/output lines flags an unusually verbose or terse response. |
+
+![Grafana — LLM Operations, bottom row](docs/screenshots/grafana-llm-operations-bottom.jpg)
+
+| Panel | Query (simplified) | Meaning |
+| :-- | :-- | :-- |
+| **Calls by Table (Adjudication Target)** | `count() GROUP BY name` | Call volume per `adjudicate:<table>` trace name — confirms every source table actually got adjudicated, and by how many calls (a re-ask shows up as a second call for the same table). |
+| **Recent Generations** | latest rows, `time`, `name`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `latency_ms` | The most granular view — one row per call, most recent first. This is the fastest place to confirm "yes, the run I just triggered from Streamlit actually reached the LLM" without leaving Grafana. |
+
+![Prometheus — scrape targets](docs/screenshots/prometheus-targets.jpg)
+
+**Prometheus (http://localhost:9090)** is *not* where the LLM dashboards
+live — it only scrapes the OTel Collector's own `/metrics` endpoint (shown
+above: one target, `otel-collector:8889`, `UP`). That covers
+infrastructure-style metrics (collector health, span/log throughput), not
+LLM call data — Langfuse writes generation records straight to its own
+ClickHouse store, which is why the LLM Operations dashboard queries
+ClickHouse directly instead of going through Prometheus. Prometheus's own
+UI is a raw PromQL query browser with no pre-built charts by design —
+that's what Grafana is for.
 
 ## Pipeline stages
 

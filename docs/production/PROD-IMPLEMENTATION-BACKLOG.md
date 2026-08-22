@@ -84,8 +84,12 @@ click between.
   prompt/response/model/token usage recorded
 - ✅ `ClaudeLLMClient`/`OllamaLLMClient` now capture real token usage
   (`response.usage` / `prompt_eval_count`+`eval_count`) as `self.last_usage`
-- ✅ Auto-enabled by `run_pipeline.py` when `LANGFUSE_PUBLIC_KEY` is set — same
-  auto-detect pattern as backend selection, no flag needed
+- ✅ Auto-enabled by both `run_pipeline.py` (CLI) and `app.py` (Streamlit
+  "▶ Run pipeline" button) when `LANGFUSE_PUBLIC_KEY` is set — same
+  auto-detect pattern as backend selection, no flag needed. (`app.py`
+  initially shipped without this wrapping — a real bug caught by noticing
+  Streamlit runs produced zero new Langfuse traces — fixed to mirror
+  `run_pipeline.py`'s per-table wrap exactly.)
 - ❌ Not done: `prompt_version`/`stage`/`field_key`/`tenant` as separate
   structured tags (generation `name` currently carries table context only,
   e.g. `adjudicate:emp_master`); `langfuse_trace_url` isn't emitted into a
